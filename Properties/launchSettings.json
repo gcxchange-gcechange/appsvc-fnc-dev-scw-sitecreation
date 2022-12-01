@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "appsvc_fnc_dev_scw_sitecreation_dotnet001": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7223",
+      "launchBrowser": false
+    }
+  }
+}
