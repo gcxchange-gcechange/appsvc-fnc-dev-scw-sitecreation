@@ -19,11 +19,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
         {
             log.LogInformation("graphAuth processed a request.");
 
-
-            IConfiguration config = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .AddEnvironmentVariables()
-            .Build();
+            IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
 
             var scopes = new string[] { "https://graph.microsoft.com/.default" };
 
@@ -48,7 +44,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             var clientSecret = secret.Value;
             // var clientSecret = config["clientSecret"];
 
-
             // using Azure.Identity;
             var options = new TokenCredentialOptions
             {
@@ -56,9 +51,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             };
 
             // https://docs.microsoft.com/dotnet/api/azure.identity.clientsecretcredential
-            var clientSecretCredential = new ClientSecretCredential(
-                tenantid, clientID, clientSecret, options);
-
+            var clientSecretCredential = new ClientSecretCredential(tenantid, clientID, clientSecret, options);
 
             try
             {
@@ -72,25 +65,21 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     log.LogInformation($"InnerException: {e.InnerException.Message}");
                 return null;
             }
-
-            
-
-
-
-            
-
-
         }
 
+       
         internal static async Task<X509Certificate2> GetKeyVaultCertificateAsync(string keyVaultUrl, string name, ILogger log)
         {
-            log.LogInformation("GetKeyVaultCertificateAsync processed a request.");
+            log.LogInformation("GetKeyVaultCertificateAsync received a request.");
 
             var serviceTokenProvider = new AzureServiceTokenProvider();
             var keyVaultClient = new KeyVaultClient(new KeyVaultClient.AuthenticationCallback(serviceTokenProvider.KeyVaultTokenCallback));
 
             SecretBundle secret = await keyVaultClient.GetSecretAsync(keyVaultUrl, name);
             X509Certificate2 certificate = new X509Certificate2(Convert.FromBase64String(secret.Value), string.Empty, X509KeyStorageFlags.MachineKeySet);
+
+            log.LogInformation("GetKeyVaultCertificateAsync processed a request.");
+
             return certificate;
 
             // If you receive the following error when running the Function;
@@ -102,6 +91,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             // Please see https://stackoverflow.com/questions/31685278/create-a-self-signed-certificate-in-net-using-an-azure-web-application-asp-ne
             // Add the following Application setting to the AF "WEBSITE_LOAD_USER_PROFILE = 1"
         }
+
 
     }
 }

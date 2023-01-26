@@ -1,29 +1,23 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
-using Azure;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.SharePoint.Client;
 using Newtonsoft.Json;
-using PnP.Core.Auth;
-using PnP.Core.Services;
-using PnP.Framework;
 using PnP.Framework.Provisioning.Connectors;
 using PnP.Framework.Provisioning.Model;
 using PnP.Framework.Provisioning.ObjectHandlers;
 using PnP.Framework.Provisioning.Providers.Xml;
-using Portable.Xaml.Markup;
+using AuthenticationManager = PnP.Framework.AuthenticationManager;
 using ExecutionContext = Microsoft.Azure.WebJobs.ExecutionContext;
 using ListItem = Microsoft.Graph.ListItem;
 
@@ -32,287 +26,199 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
     public class CreateSite
     {
         [FunctionName("CreateSite")]
-        public void Run([QueueTrigger("sitecreation", Connection = "AzureWebJobsStorage")]string myQueueItem, ILogger log, ExecutionContext functionContext)
+        public static async Task RunAsync([QueueTrigger("sitecreation", Connection = "AzureWebJobsStorage")]string myQueueItem, ILogger log, ExecutionContext functionContext)
         {
-            log.LogInformation("CreateSite trigger function processed a request.");
-
-            // todo - get site request data from the queue and replace hard-coded values
-            //      - remove uneccessary API permissions
-            //      - get userId value
-            //      - prevent duplicate calls to create when there is an issue with the queue item (poison)
-
+            log.LogInformation("CreateSite trigger function received a request.");
 
             dynamic data = JsonConvert.DeserializeObject(myQueueItem);
-            log.LogInformation($"myQueueItem: {myQueueItem}");
-
             IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
 
             string aadApplicationId = config["clientId"];
-            string description = data?.SpaceDescription;
-            string DisplayName = $"{data?.SpaceName} | {data?.SpaceNameFR}";
             string certificateName = config["certificateName"];
             string connectionString = config["AzureWebJobsStorage"];
+            string description = data?.SpaceDescription;
+            string DisplayName = $"{data?.SpaceName} | {data?.SpaceNameFR}";
             string keyVaultUrl = config["keyVaultUrl"];
+            string ownerId = config["ownerId"];
+            string queueName = data?.SecurityCategory;
             string requestId = data?.Id;
+
+            int newRequestId = Int32.Parse(requestId) + 500;    // offset to ensure unique Id
+            requestId = newRequestId.ToString();
+
+            string RequesterEmail = data?.RequesterEmail;
+            string RequesterName = data?.RequesterName;
             string sharePointUrl = config["sharePointUrl"] + requestId;
-            string tenantId = config["tenantId"];
             string userId = config["userId"];
 
             Auth auth = new Auth();
-            var graphAPIAuth = auth.graphAuth(log);
+            var graphClient = auth.graphAuth(log);
 
-            var teamId = CreateTeam(graphAPIAuth, sharePointUrl, requestId, description, userId, log).GetAwaiter().GetResult();
+            var groupId = await CreateGroup(graphClient, sharePointUrl, requestId, DisplayName, description, userId, log);
 
-            if (teamId != string.Empty)
+            if (groupId != string.Empty)
             {
-                UpdateName(graphAPIAuth, keyVaultUrl, certificateName, aadApplicationId, tenantId, sharePointUrl, teamId, requestId, DisplayName, log).GetAwaiter().GetResult();
-                ApplyTemplate(keyVaultUrl, certificateName, aadApplicationId, sharePointUrl, functionContext, log).GetAwaiter().GetResult();
-                _ = AddOwner(graphAPIAuth, teamId, "e4b36075-bb6a-4acf-badb-076b0c3d8d90", log);
-                _ = AddToQueue(connectionString, requestId, DisplayName, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+                await AddLicensedUserToGroup(graphClient, log, groupId, userId, ownerId);
 
-                // need to get trigger Unclassified via queue - LIST
-                // remove user RemoveOwner - call this only if label has been successfully applied
-                // also do research about await
+                // wait 3 minutes to allow for provisioning
+                Thread.Sleep(3 * 60 * 1000);
 
-
-
-
-
-
+                await AddTeam(graphClient, log, groupId);
+                await ApplyTemplate(keyVaultUrl, certificateName, aadApplicationId, sharePointUrl, DisplayName, functionContext, log);
+                await AddToSensitivityQueue(connectionString, queueName, requestId, groupId, DisplayName, RequesterName, RequesterEmail, log);
             }
             else
             {
                 log.LogInformation("Site already exists");
             }
+
+            log.LogInformation("CreateSite trigger function processed a request.");
         }
 
-        public static async Task<string> CreateTeam(GraphServiceClient graphClient, string sharePointUrl, string requestId, string description, string userId, ILogger log)
+        public static async Task<bool> AddToSensitivityQueue(string connectionString, string queueName, string requestId, string groupId, string DisplayName, string RequesterName, string RequesterEmail, ILogger log)
         {
-            log.LogInformation("CreateTeam received a request.");
+            log.LogInformation("AddToSensitivityQueue received a request.");
 
-            var teamId = string.Empty;
-
-            // make sure team site does not already exist
-            System.Net.Http.HttpClient client = new System.Net.Http.HttpClient();
-            var response = await client.GetAsync(sharePointUrl);
-            if (response.StatusCode != System.Net.HttpStatusCode.NotFound)
+            ListItem listItem = new ListItem
             {
-                return string.Empty;
-            }
-
-            try
-            {
-                var team = new Team
+                Fields = new FieldValueSet
                 {
-                    Description = description,
-                    DisplayName = requestId,
-                    Members = new TeamMembersCollectionPage()
-                {
-                    new AadUserConversationMember
-                    {
-                        Roles = new List<String>()
-                        {
-                            "owner"
-                        },
-                        AdditionalData = new Dictionary<string, object>()
-                        {
-                            {"user@odata.bind", $"https://graph.microsoft.com/v1.0/users('{userId}')"}
-                        }
-                    }
-                },
                     AdditionalData = new Dictionary<string, object>()
                     {
-                        {"template@odata.bind", "https://graph.microsoft.com/v1.0/teamsTemplates('standard')"}
+                        {"Id", requestId},
+                        {"groupId", groupId},
+                        {"DisplayName", DisplayName},
+                        {"RequesterName", RequesterName},
+                        {"RequesterEmail", RequesterEmail}
                     }
-                };
-
-                var teamResponse = await graphClient.Teams.Request().AddResponseAsync(team);
-                if (teamResponse.HttpHeaders.TryGetValues("Location", out var headerValues))
-                {
-                    teamId = headerValues?.First().Split('\'', StringSplitOptions.RemoveEmptyEntries)[1];
                 }
-            }
-            catch (Exception e)
-            {
-                log.LogInformation($"Message: {e.Message}");
-                if (e.InnerException is not null)
-                    log.LogInformation($"InnerException: {e.InnerException.Message}");
-                return string.Empty;
-            }
+            };
 
-            log.LogInformation($"CreateTeam received a request. teamId: {teamId}");
-            return teamId;
+            await Common.InsertMessageAsync(connectionString, queueName, listItem, log);
+
+            log.LogInformation("AddToSensitivityQueue processed a request.");
+
+            return true;
         }
 
-        public static async Task<IActionResult> AddToQueue(string connectionString, string requestId, string displayName, string requesterName, string requesterEmail, ILogger log)
+        public static async Task<string> CreateGroup(GraphServiceClient graphClient, string sharePointUrl, string requestId, string displayName, string description, string userId, ILogger log)
         {
-            log.LogInformation("AddToQueue received a request.");
+            log.LogInformation($"CreateTeam received a request. requestId: {requestId}");
+            log.LogInformation($"sharePointUrl: {sharePointUrl}");
+
+            // make sure team site does not already exist
+            HttpClient client = new HttpClient();
+            var response = await client.GetAsync(sharePointUrl);
+            if (response.StatusCode != HttpStatusCode.NotFound)
+                return string.Empty;
+
+            string groupId;
 
             try
             {
-                // send item to email queue to trigger email to user
-                var listItem = new ListItem
-                {
-                    Fields = new FieldValueSet
-                    {
-                        AdditionalData = new Dictionary<string, object>()
-                        {
-                        {"Title", displayName},
-                        {"RequesterName", requesterName},
-                        {"RequesterEmail", requesterEmail},
-                        {"Status", "Team Created"},
-                        {"Comment", ""}
-                        }
-                    }
-                };
+                log.LogInformation($"create group obj");
+                var o365Group = new Microsoft.Graph.Group
+               {
+                   Description = description,
+                   DisplayName = $@"{displayName}",
+                   GroupTypes = new List<String>() { "Unified" },
+                   MailEnabled = true,
+                   MailNickname = requestId,
+                   SecurityEnabled = false,
+                   Visibility = "Private"
+               };
 
-                listItem.Id = requestId;
-                Common.InsertMessageAsync(connectionString, "email", listItem, log).GetAwaiter().GetResult();
+                log.LogInformation($"pre-AddASync");
+                var result = await graphClient.Groups.Request().AddAsync(o365Group);
+                log.LogInformation($"post-AddASync");
+                groupId = result.Id;
+                log.LogInformation($"Site and Office 365 {displayName} created successfully. And groupId: {groupId}");
             }
             catch (Exception e)
             {
-                log.LogInformation($"Message: {e.Message}");
-                if (e.InnerException is not null)
-                    log.LogInformation($"InnerException: {e.InnerException.Message}");
-                return new BadRequestResult();
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
+
+                groupId = string.Empty;
             }
 
-            log.LogInformation("AddToQueue processed a request.");
-            return new OkResult();
+            log.LogInformation($"CreateTeam processed a request. groupId: {groupId}");
+
+            return groupId;
         }
 
-        public static async Task<IActionResult> AddOwner(GraphServiceClient graphClient, string teamId, string userId, ILogger log)
+        public static async Task<bool> AddLicensedUserToGroup(GraphServiceClient graphClient, ILogger log, string groupId, string TEAMS_INIT_USERID, string ownerId)
         {
-            log.LogInformation("AddOwner received a request.");
+            try {
+                var directoryObject = new DirectoryObject { Id = TEAMS_INIT_USERID }; //teamcreator
+                await graphClient.Groups[groupId].Owners.References.Request().AddAsync(directoryObject);
+
+                directoryObject = new DirectoryObject { Id = ownerId };
+                await graphClient.Groups[groupId].Owners.References.Request().AddAsync(directoryObject);
+            }
+            catch (Exception e)
+            {
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
+            }
+
+            log.LogInformation($"Licensed add to owner of {groupId} successfully.");
+
+            return true;
+        }
+
+        public static async Task<bool> AddTeam(GraphServiceClient graphClient, ILogger log, string groupId)
+        {
+            log.LogInformation($"---");
+            log.LogInformation($"Add Team to {groupId}.");
+            log.LogInformation($"---");
 
             try {
-                var values = new List<ConversationMember>()
+                var team = new Team
                 {
-                    new AadUserConversationMember
+                    MemberSettings = new TeamMemberSettings
                     {
-                        Roles = new List<String>() { "owner" },
-                        AdditionalData = new Dictionary<string, object>() { {"user@odata.bind", $"https://graph.microsoft.com/v1.0/users('{userId}')"} }
+                        AllowCreateUpdateChannels = true
+                    },
+                    MessagingSettings = new TeamMessagingSettings
+                    {
+                        AllowUserEditMessages = true,
+                        AllowUserDeleteMessages = true
+                    },
+                    FunSettings = new TeamFunSettings
+                    {
+                        AllowGiphy = true,
+                        GiphyContentRating = GiphyRatingType.Strict
                     }
                 };
 
-                await graphClient.Teams[teamId].Members.Add(values).Request().PostAsync();
-            }
-            catch (Exception e) 
-            {
-                log.LogInformation($"Message: {e.Message}");
-                if (e.InnerException is not null)
-                    log.LogInformation($"InnerException: {e.InnerException.Message}");
-                //return new BadRequestResult();
-            }
-
-            log.LogInformation("AddOwner processed a request.");
-            return new OkResult();
-        }
-
-        public static async Task<IActionResult> RemoveOwner(GraphServiceClient graphClient, string teamId, string userId, ILogger log)
-        {
-            log.LogInformation("RemoveOwner received a request.");
-
-            try
-            {
-                await graphClient.Teams[teamId].Members[userId].Request().DeleteAsync();
+               await graphClient.Groups[groupId].Team.Request().PutAsync(team);
             }
             catch (Exception e)
             {
-                log.LogInformation($"Message: {e.Message}");
-                if (e.InnerException is not null)
-                    log.LogInformation($"InnerException: {e.InnerException.Message}");
-                //return new BadRequestResult();
+                log.LogInformation($"---");
+                log.LogInformation($"Team creation failed!!");
+                log.LogInformation($"---");
+
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
             }
 
-            log.LogInformation("RemoveOwner processed a request.");
-            return new OkResult();
+            log.LogInformation($"---");
+            log.LogInformation($"Team created successfully.");
+            log.LogInformation($"---");
+
+            return true;
         }
 
-
-        public static async Task<IActionResult> UpdateName(GraphServiceClient graphClient, string keyVaultUrl, string certificateName, string aadApplicationId, string tenantId, string sharePointUrl, string teamId, string requestId, string displayName, ILogger log)
+        public static async Task<bool> ApplyTemplate(string keyVaultUrl, string certificateName, string aadApplicationId, string sharePointUrl, string DisplayName, ExecutionContext functionContext, ILogger log)
         {
-            log.LogInformation("UpdateName received a request.");
-
-            log.LogInformation($"Update Team where teamId is {teamId}");
-            try
-            {
-                var team = new Team { DisplayName = displayName };
-                await graphClient.Teams[teamId].Request().UpdateAsync(team);
-            }
-            catch (Exception e)
-            {
-                log.LogInformation($"Message: {e.Message}");
-                if (e.InnerException is not null)
-                    log.LogInformation($"InnerException: {e.InnerException.Message}");
-            }
-
-            log.LogInformation($"Update Share Point where sharePointUrl is {sharePointUrl}");
-            try
-            {
-                // Get certificate from the key vault
-                X509Certificate2 mycert = await Auth.GetKeyVaultCertificateAsync(keyVaultUrl, certificateName, log);
-
-                // Creates and configures the host
-                var host = Host.CreateDefaultBuilder()
-                    .ConfigureServices((context, services) =>
-                    {
-                        // Add PnP Core SDK
-                        services.AddPnPCore(options =>
-                        {
-                            // Configure the interactive authentication provider as default
-                            options.DefaultAuthenticationProvider = new X509CertificateAuthenticationProvider(aadApplicationId, tenantId, mycert);
-                        });
-                    })
-                    .UseConsoleLifetime()
-                    .Build();
-
-                // Start the host
-                await host.StartAsync();
-
-                using (var scope = host.Services.CreateScope())
-                {
-                    // Ask an IPnPContextFactory from the host
-                    var pnpContextFactory = scope.ServiceProvider.GetRequiredService<IPnPContextFactory>();
-
-                    // Create a PnPContext
-                    using (var context = await pnpContextFactory.CreateAsync(new Uri(sharePointUrl)))
-                    {
-                        context.GraphFirst = false; // reference: https://pnp.github.io/pnpcore/using-the-sdk/basics-apis.html
-                        var web = await context.Web.GetAsync(p => p.Title);
-                        web.Title = displayName;
-                        await web.UpdateAsync();
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                log.LogInformation($"Message: {e.Message}");
-                if (e.InnerException is not null)
-                    log.LogInformation($"InnerException: {e.InnerException.Message}");
-            }
-
-            //log.LogInformation("Update Group");
-            //try
-            //{
-            //    var group = new Group { DisplayName = displayName };
-            //    await graphClient.Groups[teamId].Request().UpdateAsync(group);
-            //}
-            //catch (Exception e)
-            //{
-            //    log.LogInformation($"Message: {e.Message}");
-            //    if (e.InnerException is not null)
-            //        log.LogInformation($"InnerException: {e.InnerException.Message}");
-            //}
-
-            log.LogInformation("UpdateName processed a request.");
-
-            return new OkResult();
-        }
-
-        public static async Task<IActionResult> ApplyTemplate(string keyVaultUrl, string certificateName, string aadApplicationId, string sharePointUrl, ExecutionContext functionContext, ILogger log)
-        {
+            log.LogInformation($"---");
             log.LogInformation("ApplyTemplate received a request.");
+            log.LogInformation($"---");
 
             X509Certificate2 mycert = await Auth.GetKeyVaultCertificateAsync(keyVaultUrl, certificateName, log);
 
@@ -323,13 +229,14 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
             try
             {
-
                 ctx.RequestTimeout = Timeout.Infinite;
+
                 Web web = ctx.Web;
                 ctx.Load(web, w => w.Title);
                 ctx.ExecuteQuery();
 
                 log.LogInformation($"Successfully connected to site: {web.Title}");
+                log.LogInformation($"---");
 
                 DirectoryInfo dInfo;
                 var schemaDir = "";
@@ -349,13 +256,15 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     schemaDir = dInfo.Parent.FullName + "\\Templates\\GenericTemplate";
                 }
 
-               DirectoryInfo dInfo2 = new DirectoryInfo(schemaDir);
+                DirectoryInfo dInfo2 = new DirectoryInfo(schemaDir);
 
-               XMLTemplateProvider sitesProvider = new XMLFileSystemTemplateProvider(schemaDir, "");
+                XMLTemplateProvider sitesProvider = new XMLFileSystemTemplateProvider(schemaDir, "");
 
                 string PNP_TEMPLATE_FILE = "template-name.xml";
+
                 ProvisioningTemplate template = sitesProvider.GetTemplate(PNP_TEMPLATE_FILE);
                 log.LogInformation($"Successfully found template with ID '{template.Id}'");
+                log.LogInformation($"---");
 
                 ProvisioningTemplateApplyingInformation ptai = new ProvisioningTemplateApplyingInformation
                 {
@@ -364,15 +273,28 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                         log.LogInformation(string.Format("{0:00}/{1:00} - {2} : {3}", progress, total, message, web.Title));
                     }
                 };
-                FileSystemConnector connector = new FileSystemConnector(schemaDir, "");
 
+                FileSystemConnector connector = new FileSystemConnector(schemaDir, "");
                 template.Connector = connector;
 
+                //template.Parameters.Add("DisplayName", "Dispay Name Test");
+                //template.Parameters.Add("Title", "Title Test");
+
                 log.LogInformation("ApplyProvisioningTemplate...");
-                web.ApplyProvisioningTemplate(template, ptai);
+                try
+                {
+                    web.ApplyProvisioningTemplate(template, ptai);
+                }
+                catch (Exception e)
+                {
+                    log.LogError($"Message: {e.Message}");
+                    if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                    log.LogError($"StackTrace: {e.StackTrace}");
+                }
                 log.LogInformation("...worked!");
 
                 log.LogInformation($"Site {web.Title} apply template successfully.");
+                log.LogInformation($"---");
             }
             catch (ReflectionTypeLoadException ex)
             {
@@ -390,21 +312,9 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             }
 
             log.LogInformation("ApplyTemplate processed a request.");
-            return new OkResult();
+            log.LogInformation($"---");
+
+            return true;
         }
-
-        // log.LogInformation("UpdateName processed a request.");
-        // var group = new Group { DisplayName = displayName };
-        // var team = new Team { DisplayName = displayName };
-
-        // // recollection before testing - OP, 2022.11.03
-        // // these two methods appear to update AAD at the same time
-        // // but not SharePoint
-
-        // //await graphClient.Groups[teamId].Request().UpdateAsync(group); // updated aad immediately, still not on SharePoint after an hour
-        // await graphClient.Teams[teamId].Request().UpdateAsync(team); // updated aad (almost) immediately, updated SharePoint in minutes -- weird, I thought it took longer last time!!
-        //                                                              // ok ran again and did not update SP after about an hour
-        // // method 3: updates SharePoint URL almost immediately; aad not so much... ; actually SP Admin got the update before aad, still waiting... 26 minutes later
-        //// SharePoint Admin Centre has it's own lag issues
     }
 }
