@@ -26,6 +26,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </None>
+    <None Update="SiteAssets\__siteIcon__.jpg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\GenericTemplate\SiteAssets\SitePages\8styqonv\2361304957-canada.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Templates\GenericTemplate\SiteAssets\SitePages\About-us\3856-Person-creating-a-calendar-with-adhesive-notes-on-a-blackboard.jpg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -33,6 +39,21 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Templates\GenericTemplate\SiteAssets\SitePages\Communications\5340-gouv_EN_couleurs-01.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\GenericTemplate\SiteAssets\SitePages\Events2\1101512226-canada.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\GenericTemplate\SiteAssets\SitePages\Events\652714532-canada.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\GenericTemplate\SiteAssets\SitePages\Files2\3915304571-canada.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\GenericTemplate\SiteAssets\SitePages\News\1507457389-canada.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\GenericTemplate\SiteAssets\__siteIcon__.jpg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Templates\GenericTemplate\SiteAssets\__siteIcon__.png">
@@ -50,8 +71,14 @@
     <None Update="Templates\GenericTemplate\template-name.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Templates\GenericTemplate\template-new.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Templates\GenericTemplate\template.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="SiteAssets\" />
   </ItemGroup>
 </Project>

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Mail;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
@@ -12,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.SharePoint.Client;
+using Microsoft.SharePoint.News.DataModel;
 using Newtonsoft.Json;
 using PnP.Framework.Provisioning.Connectors;
 using PnP.Framework.Provisioning.Model;
@@ -37,9 +40,13 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string certificateName = config["certificateName"];
             string connectionString = config["AzureWebJobsStorage"];
             string description = data?.SpaceDescription;
+
             string DisplayName = $"{data?.SpaceName} | {data?.SpaceNameFR}";
+            
+
             string keyVaultUrl = config["keyVaultUrl"];
-            string ownerId = config["ownerId"];
+            //string ownerId = config["ownerId"];
+            string owners = data?.Owner1;
             string queueName = data?.SecurityCategory;
             string requestId = data?.Id;
 
@@ -51,20 +58,34 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string sharePointUrl = config["sharePointUrl"] + requestId;
             string userId = config["userId"];
 
+            string members = data?.Members;
+
+            string siteId = config["siteId"];
+            string listId = config["listId"];
+            string itemId = data?.Id;
+
             Auth auth = new Auth();
             var graphClient = auth.graphAuth(log);
 
             var groupId = await CreateGroup(graphClient, sharePointUrl, requestId, DisplayName, description, userId, log);
+            log.LogInformation($"teamId: {groupId}");
 
             if (groupId != string.Empty)
             {
-                await AddLicensedUserToGroup(graphClient, log, groupId, userId, ownerId);
+                await UpdateSiteUrl(graphClient, sharePointUrl, siteId, listId, itemId, log);
+
+                await AddOwnersToGroup(graphClient, log, groupId, userId, owners);
 
                 // wait 3 minutes to allow for provisioning
                 Thread.Sleep(3 * 60 * 1000);
 
-                await AddTeam(graphClient, log, groupId);
+                var teamId = await AddTeam(graphClient, log, groupId);
+                log.LogInformation($"teamId: {teamId}");
+
                 await ApplyTemplate(keyVaultUrl, certificateName, aadApplicationId, sharePointUrl, DisplayName, functionContext, log);
+
+                await AddMembersToTeam(graphClient, log, groupId, teamId, members);
+
                 await AddToSensitivityQueue(connectionString, queueName, requestId, groupId, DisplayName, RequesterName, RequesterEmail, log);
             }
             else
@@ -101,9 +122,44 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return true;
         }
 
+
+        public static async Task<string> UpdateSiteUrl(GraphServiceClient graphClient, string sharePointUrl, string siteId, string listId, string itemId, ILogger log)
+        {
+            log.LogInformation("UpdateSiteUrl received a request.");
+
+            log.LogInformation($"sharePointUrl: {sharePointUrl}");
+            log.LogInformation($"siteId: {siteId}");
+            log.LogInformation($"listId: {listId}");
+            log.LogInformation($"itemId: {itemId}");
+
+            try
+            {
+                var fieldValueSet = new FieldValueSet
+                {
+                    AdditionalData = new Dictionary<string, object>()
+                    {
+                        {"SiteUrl", sharePointUrl}
+                    }
+                };
+
+                await graphClient.Sites[siteId].Lists[listId].Items[itemId].Fields.Request().UpdateAsync(fieldValueSet);
+            }
+
+            catch (Exception e)
+            {
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
+            }
+
+            log.LogInformation("UpdateSiteUrl processed a request.");
+
+            return string.Empty;
+        }
+
         public static async Task<string> CreateGroup(GraphServiceClient graphClient, string sharePointUrl, string requestId, string displayName, string description, string userId, ILogger log)
         {
-            log.LogInformation($"CreateTeam received a request. requestId: {requestId}");
+            log.LogInformation($"CreateGroup received a request. requestId: {requestId}");
             log.LogInformation($"sharePointUrl: {sharePointUrl}");
 
             // make sure team site does not already exist
@@ -126,11 +182,9 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                    MailNickname = requestId,
                    SecurityEnabled = false,
                    Visibility = "Private"
-               };
+                };
 
-                log.LogInformation($"pre-AddASync");
                 var result = await graphClient.Groups.Request().AddAsync(o365Group);
-                log.LogInformation($"post-AddASync");
                 groupId = result.Id;
                 log.LogInformation($"Site and Office 365 {displayName} created successfully. And groupId: {groupId}");
             }
@@ -143,19 +197,22 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 groupId = string.Empty;
             }
 
-            log.LogInformation($"CreateTeam processed a request. groupId: {groupId}");
+            log.LogInformation($"CreateGroup processed a request. groupId: {groupId}");
 
             return groupId;
         }
 
-        public static async Task<bool> AddLicensedUserToGroup(GraphServiceClient graphClient, ILogger log, string groupId, string TEAMS_INIT_USERID, string ownerId)
+        public static async Task<bool> AddOwnersToGroup(GraphServiceClient graphClient, ILogger log, string groupId, string TEAMS_INIT_USERID, string owners)
         {
             try {
                 var directoryObject = new DirectoryObject { Id = TEAMS_INIT_USERID }; //teamcreator
                 await graphClient.Groups[groupId].Owners.References.Request().AddAsync(directoryObject);
 
-                directoryObject = new DirectoryObject { Id = ownerId };
-                await graphClient.Groups[groupId].Owners.References.Request().AddAsync(directoryObject);
+                foreach (string id in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    directoryObject = new DirectoryObject { Id = id };
+                    await graphClient.Groups[groupId].Owners.References.Request().AddAsync(directoryObject);
+                }
             }
             catch (Exception e)
             {
@@ -169,11 +226,63 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return true;
         }
 
-        public static async Task<bool> AddTeam(GraphServiceClient graphClient, ILogger log, string groupId)
+        public static async Task<bool> AddMembersToTeam(GraphServiceClient graphClient, ILogger log, string groupId, string teamId, string Members)
         {
-            log.LogInformation($"---");
-            log.LogInformation($"Add Team to {groupId}.");
-            log.LogInformation($"---");
+            log.LogInformation("AddMembersToTeam received a request.");
+
+            try
+            {
+                foreach (string memberId in Members.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    log.LogInformation($"memberId: {memberId}");
+
+                    var directoryObject = new DirectoryObject
+                    {
+                        Id = memberId
+                    };
+                    await graphClient.Groups[groupId].Members.References.Request().AddAsync(directoryObject);
+
+                    AadUserConversationMember mem = new AadUserConversationMember
+                    {
+                        Roles = new List<String>()
+                        {
+                            "member"
+                        },
+                        AdditionalData = new Dictionary<string, object>()
+                        {
+                            {"user@odata.bind", $"https://graph.microsoft.com/v1.0/users('{memberId}')"}
+                        }
+                    };
+                    await graphClient.Teams[teamId].Members.Request().AddAsync(mem);
+                }
+
+
+
+
+
+
+
+
+
+
+            }
+            catch (Exception e)
+            {
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
+            }
+
+           log.LogInformation("AddMembersToTeam processed a request.");
+
+            return true;
+        }
+
+        public static async Task<string> AddTeam(GraphServiceClient graphClient, ILogger log, string groupId)
+        {
+            log.LogInformation("AddTeam received a request.");
+
+            string teamId = string.Empty;
 
             try {
                 var team = new Team
@@ -192,9 +301,11 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                         AllowGiphy = true,
                         GiphyContentRating = GiphyRatingType.Strict
                     }
+
                 };
 
-               await graphClient.Groups[groupId].Team.Request().PutAsync(team);
+                var t = await graphClient.Groups[groupId].Team.Request().PutAsync(team);
+                teamId = t.Id;
             }
             catch (Exception e)
             {
@@ -207,11 +318,9 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 log.LogError($"StackTrace: {e.StackTrace}");
             }
 
-            log.LogInformation($"---");
-            log.LogInformation($"Team created successfully.");
-            log.LogInformation($"---");
+            log.LogInformation("AddTeam processed a request.");
 
-            return true;
+            return teamId;
         }
 
         public static async Task<bool> ApplyTemplate(string keyVaultUrl, string certificateName, string aadApplicationId, string sharePointUrl, string DisplayName, ExecutionContext functionContext, ILogger log)
@@ -260,11 +369,43 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 XMLTemplateProvider sitesProvider = new XMLFileSystemTemplateProvider(schemaDir, "");
 
-                string PNP_TEMPLATE_FILE = "template-name.xml";
+                string PNP_TEMPLATE_FILE = "template-new.xml";
 
                 ProvisioningTemplate template = sitesProvider.GetTemplate(PNP_TEMPLATE_FILE);
                 log.LogInformation($"Successfully found template with ID '{template.Id}'");
-                log.LogInformation($"---");
+
+
+                //ContentTypeBinding bindingToLookFor = new ContentTypeBinding();
+                //bindingToLookFor.ContentTypeId = "0x01002CF74A4DAE39480396EEA7A4BA2BE5FB";
+
+                ////var offendingLists = template.Lists.Where(l => l.ContentTypeBindings.Contains(bindingToLookFor));
+                //var offendingLists = template.Lists;
+
+                //log.LogInformation("Look for content binding...");
+                //foreach (var l in offendingLists)
+                //{
+                //    //l.ContentTypeBindings.Remove(bindingToLookFor);
+                //    log.LogInformation($"l.Title: {l.Title} - l.Description: {l.Description}");
+
+                //    log.LogInformation("Bindings:");
+                //    foreach (var b in l.ContentTypeBindings)
+                //    {
+                //        log.LogInformation($"b.ContentTypeId: {b.ContentTypeId}");
+
+                //        if (b.ContentTypeId == "0x01002CF74A4DAE39480396EEA7A4BA2BE5FB")
+                //        {
+                //            log.LogInformation("Found it!");
+                //            l.ContentTypeBindings.Remove(b);
+                //            // Message: Collection was modified; enumeration operation may not execute.
+                //        }
+
+
+                //    }
+                //    log.LogInformation("----------------------------------------------------");
+                //}
+
+                //log.LogInformation("...done?");
+
 
                 ProvisioningTemplateApplyingInformation ptai = new ProvisioningTemplateApplyingInformation
                 {
@@ -279,6 +420,14 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 //template.Parameters.Add("DisplayName", "Dispay Name Test");
                 //template.Parameters.Add("Title", "Title Test");
+                //
+                //log.LogInformation("SiteGroups:");
+                //foreach (var g in template.Security.SiteGroups)
+                //{
+                //    log.LogInformation($"g.Description: {g.Description}");
+                //}
+                //template.Security.AdditionalAdministrators.Add()
+                // template.Security.SiteGroups[].Description
 
                 log.LogInformation("ApplyProvisioningTemplate...");
                 try
