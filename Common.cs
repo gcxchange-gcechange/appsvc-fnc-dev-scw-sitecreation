@@ -10,25 +10,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 {
     internal class Common
     {
-       //public class SpaceRequest
-       // {
-       //     public string Id { get; set; }
-       //     public string SecurityCategory { get; set; }
-       //     public string SpaceName { get; set; }
-       //     public string SpaceNameFR { get; set; }
-       //     public string Owner1 { get; set; }
-       //     public string SpaceDescription { get; set; }
-       //     public string SpaceDescriptionFR { get; set; }
-       //     public string TemplateTitle { get; set; }
-       //     public string TeamPurpose { get; set; }
-       //     public string BusinessJustification { get; set; }
-       //     public string RequesterName { get; set; }
-       //     public string RequesterEmail { get; set; }
-       //     public string Status { get; set; }
-       //     public string ApprovedDate { get; set; }
-       //     public string Comment { get; set; }
-       // }
-
         public static async Task InsertMessageAsync(string connectionString, string queueName, ListItem listItem, ILogger log)
         {
             log.LogInformation("InsertMessageAsync received a request.");
