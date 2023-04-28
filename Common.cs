@@ -38,26 +38,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
                 CloudQueue queue = queueClient.GetQueueReference(queueName);
 
-                //SpaceRequest request = new SpaceRequest();
-
-                //request.Id = listItem.Id;
-
-                //request.SecurityCategory = listItem.Fields.AdditionalData.Keys.Contains("SecurityCategory") ? listItem.Fields.AdditionalData["SecurityCategory"].ToString() : string.Empty;
-                //request.SpaceName = listItem.Fields.AdditionalData.Keys.Contains("Title") ? listItem.Fields.AdditionalData["Title"].ToString() : string.Empty;
-                //request.SpaceNameFR = listItem.Fields.AdditionalData.Keys.Contains("SpaceNameFR") ? listItem.Fields.AdditionalData["SpaceNameFR"].ToString() : string.Empty;
-                //request.Owner1 = listItem.Fields.AdditionalData.Keys.Contains("Owner1") ? listItem.Fields.AdditionalData["Owner1"].ToString() : string.Empty;
-                //request.SpaceDescription = listItem.Fields.AdditionalData.Keys.Contains("SpaceDescription") ? listItem.Fields.AdditionalData["SpaceDescription"].ToString() : string.Empty;
-                //request.SpaceDescriptionFR = listItem.Fields.AdditionalData.Keys.Contains("SpaceDescriptionFR") ? listItem.Fields.AdditionalData["SpaceDescriptionFR"].ToString() : string.Empty;
-                //request.TemplateTitle = listItem.Fields.AdditionalData.Keys.Contains("TemplateTitle") ? listItem.Fields.AdditionalData["TemplateTitle"].ToString() : string.Empty;
-                //request.TeamPurpose = listItem.Fields.AdditionalData.Keys.Contains("TeamPurpose") ? listItem.Fields.AdditionalData["TeamPurpose"].ToString() : string.Empty;
-                //request.BusinessJustification = listItem.Fields.AdditionalData.Keys.Contains("BusinessJustification") ? listItem.Fields.AdditionalData["BusinessJustification"].ToString() : string.Empty;
-                //request.RequesterName = listItem.Fields.AdditionalData.Keys.Contains("RequesterName") ? listItem.Fields.AdditionalData["RequesterName"].ToString() : string.Empty;
-                //request.RequesterEmail = listItem.Fields.AdditionalData.Keys.Contains("RequesterEmail") ? listItem.Fields.AdditionalData["RequesterEmail"].ToString() : string.Empty;
-                //request.Status = listItem.Fields.AdditionalData.Keys.Contains("Status") ? listItem.Fields.AdditionalData["Status"].ToString() : string.Empty;
-                //request.ApprovedDate = listItem.Fields.AdditionalData.Keys.Contains("ApprovedDate") ? listItem.Fields.AdditionalData["ApprovedDate"].ToString() : string.Empty;
-                //request.Comment = listItem.Fields.AdditionalData.Keys.Contains("Comment") ? listItem.Fields.AdditionalData["Comment"].ToString() : string.Empty;
-
-                string serializedMessage = JsonConvert.SerializeObject(listItem.Fields.AdditionalData); //JsonConvert.SerializeObject(request);
+                string serializedMessage = JsonConvert.SerializeObject(listItem.Fields.AdditionalData);
 
                 CloudQueueMessage message = new CloudQueueMessage(serializedMessage);
                 await queue.AddMessageAsync(message);
