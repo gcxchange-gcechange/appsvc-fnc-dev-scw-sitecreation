@@ -1,32 +1,23 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.Mail;
 using System.Reflection;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using Azure.Core;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
-using Microsoft.Online.SharePoint.TenantAdministration;
-using Microsoft.SharePoint.Administration;
 using Microsoft.SharePoint.Client;
-using Microsoft.SharePoint.News.DataModel;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using PnP.Framework.Provisioning.Connectors;
 using PnP.Framework.Provisioning.Model;
 using PnP.Framework.Provisioning.ObjectHandlers;
 using PnP.Framework.Provisioning.Providers.Xml;
 using static appsvc_fnc_dev_scw_sitecreation_dotnet001.Auth;
-using AuthenticationManager = PnP.Framework.AuthenticationManager;
 using ExecutionContext = Microsoft.Azure.WebJobs.ExecutionContext;
 using ListItem = Microsoft.Graph.ListItem;
 
@@ -39,61 +30,47 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
         {
             log.LogInformation("CreateSite trigger function received a request.");
 
-            dynamic data = JsonConvert.DeserializeObject(myQueueItem);
+            // assign variables from config
             IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
-
-            string aadApplicationId = config["clientId"];
-            string certificateName = config["certificateName"];
             string connectionString = config["AzureWebJobsStorage"];
+            string followingContentFeatureId = config["followingContentFeatureId"];
+            string listId = config["listId"];
+            string ownerId = config["ownerId"];
+            string siteId = config["siteId"];
+            string teamsChannelId = config["teamsChannelId"];
+            string tenantId = config["tenantId"];
+            string tenantName = config["tenantName"];
+            string userId = config["userId"];
+
+            // assign variables from queue
+            dynamic data = JsonConvert.DeserializeObject(myQueueItem);
             string descriptionEn = data?.SpaceDescription;
             string descriptionFr = data?.SpaceDescriptionFR;
-
-            string DisplayName = $"{data?.SpaceName} - {data?.SpaceNameFR}";
-            
-
-            string keyVaultUrl = config["keyVaultUrl"];
+            string displayName = $"{data?.SpaceName} - {data?.SpaceNameFR}";
+            string itemId = data?.Id;
+            string members = data?.Members;
             string owners = data?.Owner1;
             string queueName = data?.SecurityCategory;
             string requestId = data?.Id;
+            string requesterEmail = data?.RequesterEmail;
+            string requesterName = data?.RequesterName;
 
-            log.LogInformation($"queueName: {queueName}");
-
+            // manipulated values
             int newRequestId = Int32.Parse(requestId) + 500;    // offset to ensure unique Id
             requestId = newRequestId.ToString();
-
-            string RequesterEmail = data?.RequesterEmail;
-            string RequesterName = data?.RequesterName;
             string sharePointUrl = config["sharePointUrl"] + requestId;
-            string userId = config["userId"];
-
-            string ownerId = config["ownerId"];
-
-            string members = data?.Members;
-
-            string siteId = config["siteId"];
-            string listId = config["listId"];
-            string itemId = data?.Id;
-
-            string tenantId = config["tenantId"];
 
             Auth auth = new Auth();
             var graphClient = auth.graphAuth(log);
 
-            // fails when service account not included in Owner list -- fix this!!
-            // sv-caupdate@devgcx.ca
-
-
-
-
-
-            var groupId = await CreateGroup(graphClient, sharePointUrl, requestId, DisplayName, descriptionEn, userId, log);
+            var groupId = await CreateGroup(graphClient, sharePointUrl, requestId, displayName, descriptionEn, userId, log);
             log.LogInformation($"teamId: {groupId}");
 
             if (groupId != string.Empty)
             {
                 await UpdateSiteUrl(graphClient, sharePointUrl, siteId, listId, itemId, log);
 
-                await AddOwnersToGroup(graphClient, log, groupId, userId, owners);
+                await AddOwnersToGroup(graphClient, log, groupId, userId, ownerId, owners);
 
                 // wait 3 minutes to allow for provisioning
                 Thread.Sleep(3 * 60 * 1000);
@@ -101,11 +78,11 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 var teamId = await AddTeam(graphClient, log, groupId);
                 log.LogInformation($"teamId: {teamId}");
 
-                await ApplyTemplate(keyVaultUrl, certificateName, aadApplicationId, sharePointUrl, descriptionEn, descriptionFr, groupId, tenantId, functionContext, log);
+                await ApplyTemplate(sharePointUrl, tenantName, tenantId, groupId, descriptionEn, descriptionFr, followingContentFeatureId, teamsChannelId, functionContext, log);
 
                 await AddMembersToTeam(graphClient, log, groupId, teamId, members);
 
-                await AddToSensitivityQueue(connectionString, queueName, itemId, requestId, groupId, DisplayName, RequesterName, RequesterEmail, log);
+                await AddToSensitivityQueue(connectionString, queueName, itemId, requestId, groupId, displayName, requesterName, requesterEmail, log);
             }
             else
             {
@@ -192,7 +169,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
             try
             {
-                log.LogInformation($"create group obj");
                 var o365Group = new Microsoft.Graph.Group
                {
                    Description = description,
@@ -204,23 +180,8 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                    Visibility = "Private"
                 };
 
-
-
-
-
                 var result = await graphClient.Groups.Request().AddAsync(o365Group);
                 groupId = result.Id;
-                
-                
-                
-
-
-
-
-
-
-
-
 
                 log.LogInformation($"Site and Office 365 {displayName} created successfully. And groupId: {groupId}");
             }
@@ -238,33 +199,20 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return groupId;
         }
 
-        public static async Task<bool> AddOwnersToGroup(GraphServiceClient graphClient, ILogger log, string groupId, string TEAMS_INIT_USERID, string owners)
+        public static async Task<bool> AddOwnersToGroup(GraphServiceClient graphClient, ILogger log, string groupId, string teamCreatorId, string tempOwnerId, string owners)
         {
+            log.LogInformation("AddOwnersToGroup received a request.");
+
             try {
-                var directoryObject = new DirectoryObject { Id = TEAMS_INIT_USERID }; //teamcreator
-                await graphClient.Groups[groupId].Owners.References.Request().AddAsync(directoryObject);
+                await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = teamCreatorId });
+                await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = tempOwnerId });
 
                 foreach (string email in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
                 {
                     var user = await graphClient.Users[email].Request().GetAsync();
                     var id = user.Id;
-
-                    log.LogInformation($"email: {email}");
-                    log.LogInformation($"id: {id}");
-
-                    directoryObject = new DirectoryObject { Id = id };
-                    await graphClient.Groups[groupId].Owners.References.Request().AddAsync(directoryObject);
+                    await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = id });
                 }
-
-                //foreach (string id in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
-                //{
-                //    directoryObject = new DirectoryObject { Id = id };
-                //    await graphClient.Groups[groupId].Owners.References.Request().AddAsync(directoryObject);
-                //}
-
-
-
-
             }
             catch (Exception e)
             {
@@ -273,7 +221,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 log.LogError($"StackTrace: {e.StackTrace}");
             }
 
-            log.LogInformation($"Licensed add to owner of {groupId} successfully.");
+            log.LogInformation("AddOwnersToGroup processed a request.");
 
             return true;
         }
@@ -311,44 +259,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     };
                     await graphClient.Teams[teamId].Members.Request().AddAsync(mem);
                 }
-
-
-                //foreach (string memberId in Members.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
-                //{
-                //    log.LogInformation($"memberId: {memberId}");
-
-
-                //    // var user  = await graphClient.Users["user@tenant.onmicrosoft.com"].Request().GetAsync();
-
-                //    var directoryObject = new DirectoryObject
-                //    {
-                //        Id = memberId
-                //    };
-                //    await graphClient.Groups[groupId].Members.References.Request().AddAsync(directoryObject);
-
-                //    AadUserConversationMember mem = new AadUserConversationMember
-                //    {
-                //        Roles = new List<String>()
-                //        {
-                //            "member"
-                //        },
-                //        AdditionalData = new Dictionary<string, object>()
-                //        {
-                //            {"user@odata.bind", $"https://graph.microsoft.com/v1.0/users('{memberId}')"}
-                //        }
-                //    };
-                //    await graphClient.Teams[teamId].Members.Request().AddAsync(mem);
-                //}
-
-
-
-
-
-
-
-
-
-
             }
             catch (Exception e)
             {
@@ -405,16 +315,17 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return teamId;
         }
 
-        public static async Task<bool> ApplyTemplate(string keyVaultUrl, string certificateName, string aadApplicationId, string sharePointUrl, string descriptionEn, string descriptionFr, string groupId, string tenantId, ExecutionContext functionContext, ILogger log)
+        public static async Task<bool> ApplyTemplate(string sharePointUrl, string tenantName, string tenantId, string groupId, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsChannelId, ExecutionContext functionContext, ILogger log)
         {
             log.LogInformation("ApplyTemplate received a request.");
 
             try
             {
-                X509Certificate2 mycert = await Auth.GetKeyVaultCertificateAsync(keyVaultUrl, certificateName, log);
-                string tenantName = "devgcx";
-                AuthenticationManager auth = new AuthenticationManager(aadApplicationId, mycert, $"{tenantName}.onmicrosoft.com");
-                ClientContext ctx = await auth.GetContextAsync(sharePointUrl);
+                ROPCConfidentialTokenCredential token = new ROPCConfidentialTokenCredential(log);
+                var scopes = new string[] { $"https://{tenantName}.sharepoint.com/.default" };
+                var authManager = new PnP.Framework.AuthenticationManager();
+                var accessToken = await token.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
+                var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
 
                 Web web = ctx.Web;
                 ctx.Load(web, w => w.Title);
@@ -422,7 +333,8 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 log.LogInformation($"Successfully connected to site: {web.Title}");
 
-                web.DeactivateFeature(Guid.Parse("a7a2793e-67cd-4dc1-9fd0-43f61581207a"));
+                //deactivate the following content feature
+                web.DeactivateFeature(Guid.Parse(followingContentFeatureId));
 
                 DirectoryInfo dInfo;
                 var schemaDir = "";
@@ -451,32 +363,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 ProvisioningTemplate template = sitesProvider.GetTemplate(PNP_TEMPLATE_FILE);
                 log.LogInformation($"Successfully found template with ID '{template.Id}'");
 
-
-                //ContentTypeBinding bindingToLookFor = new ContentTypeBinding();
-                //bindingToLookFor.ContentTypeId = "0x01002CF74A4DAE39480396EEA7A4BA2BE5FB";
-                ////var offendingLists = template.Lists.Where(l => l.ContentTypeBindings.Contains(bindingToLookFor));
-                //var offendingLists = template.Lists;
-                //log.LogInformation("Look for content binding...");
-                //foreach (var l in offendingLists)
-                //{
-                //    //l.ContentTypeBindings.Remove(bindingToLookFor);
-                //    log.LogInformation($"l.Title: {l.Title} - l.Description: {l.Description}");
-
-                //    log.LogInformation("Bindings:");
-                //    foreach (var b in l.ContentTypeBindings)
-                //    {
-                //        log.LogInformation($"b.ContentTypeId: {b.ContentTypeId}");
-
-                //        if (b.ContentTypeId == "0x01002CF74A4DAE39480396EEA7A4BA2BE5FB")
-                //        {
-                //            log.LogInformation("Found it!");
-                //            l.ContentTypeBindings.Remove(b);
-                //            // Message: Collection was modified; enumeration operation may not execute.
-                //        }
-                //    }
-                //}
-
-
                 ProvisioningTemplateApplyingInformation ptai = new ProvisioningTemplateApplyingInformation
                 {
                     ProgressDelegate = (message, progress, total) =>
@@ -488,11 +374,9 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 FileSystemConnector connector = new FileSystemConnector(schemaDir, "");
                 template.Connector = connector;
 
-                string channelId = "19:04caAwDSgvgU-DO11zXbh8i_q1y6rTVBwGChkRPmVNg1@thread.tacv2";
-
                 template.Parameters.Add("DescriptionEn", descriptionEn);
                 template.Parameters.Add("DescriptionFr", descriptionFr);
-                template.Parameters.Add("MSTeamsUrl", $"https://teams.microsoft.com/_#/l/team/{channelId}/conversations?groupId={groupId}&amp;tenantId={tenantId}");
+                template.Parameters.Add("MSTeamsUrl", $"https://teams.microsoft.com/_#/l/team/{teamsChannelId}/conversations?groupId={groupId}&amp;tenantId={tenantId}");
 
                 log.LogInformation("ApplyProvisioningTemplate...");
                 try
@@ -527,17 +411,5 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
             return true;
         }
-
-
-      
-
-
-
-
-
-
-
-
-
     }
 }
