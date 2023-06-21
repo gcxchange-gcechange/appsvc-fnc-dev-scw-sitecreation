@@ -4,14 +4,18 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Security.Policy;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Core;
+using Azure.Identity;
+using CamlBuilder;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.SharePoint.Client;
+using Microsoft.VisualBasic;
 using Newtonsoft.Json;
 using PnP.Framework.Provisioning.Connectors;
 using PnP.Framework.Provisioning.Model;
@@ -55,6 +59,12 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string requesterEmail = data?.RequesterEmail;
             string requesterName = data?.RequesterName;
 
+            string delegatedListUserName = config["delegatedListUserName"];
+            string delegatedListUserSecret =  config["delegatedListUserSecret"];
+
+            string delegatedSVUserName = config["user_name"];
+            string delegatedSVUserSecret = config["secretNamePassword"];
+
             // manipulated values
             int newRequestId = Int32.Parse(requestId) + 500;    // offset to ensure unique Id
             requestId = newRequestId.ToString();
@@ -68,19 +78,21 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
             if (groupId != string.Empty)
             {
-                await UpdateSiteUrl(graphClient, sharePointUrl, siteId, listId, itemId, log);
+                //graphClient, 
+                await UpdateSiteUrl(delegatedListUserName, delegatedListUserSecret, sharePointUrl, siteId, listId, itemId, log);
 
                 await AddOwnersToGroup(graphClient, log, groupId, userId, ownerId, owners);
 
                 // wait 3 minutes to allow for provisioning
                 Thread.Sleep(3 * 60 * 1000);
 
-                var teamId = await AddTeam(graphClient, log, groupId);
+                var teamId = await AddTeam(groupId, delegatedSVUserName, delegatedSVUserSecret, log);
                 log.LogInformation($"teamId: {teamId}");
 
-                await ApplyTemplate(sharePointUrl, tenantName, tenantId, groupId, descriptionEn, descriptionFr, followingContentFeatureId, teamsChannelId, functionContext, log);
+                await ApplyTemplate(sharePointUrl, tenantName, tenantId, groupId, descriptionEn, descriptionFr, followingContentFeatureId, teamsChannelId, delegatedSVUserName, delegatedSVUserSecret, functionContext, log);
 
-                await AddMembersToTeam(graphClient, log, groupId, teamId, members);
+                // deferred functionality
+                //await AddMembersToTeam(graphClient, log, groupId, teamId, members);
 
                 await AddToSensitivityQueue(connectionString, queueName, itemId, requestId, groupId, displayName, requesterName, requesterEmail, log);
             }
@@ -119,15 +131,15 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return true;
         }
 
-
-        public static async Task<string> UpdateSiteUrl(GraphServiceClient graphClient, string sharePointUrl, string siteId, string listId, string itemId, ILogger log)
+        //GraphServiceClient graphClient, 
+        public static async Task<string> UpdateSiteUrl(string userName, string userSecret, string sharePointUrl, string siteId, string listId, string itemId, ILogger log)
         {
             log.LogInformation("UpdateSiteUrl received a request.");
 
-            log.LogInformation($"sharePointUrl: {sharePointUrl}");
-            log.LogInformation($"siteId: {siteId}");
-            log.LogInformation($"listId: {listId}");
-            log.LogInformation($"itemId: {itemId}");
+            IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
+
+            ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(userName, userSecret, log);
+            var graphClient = new GraphServiceClient(auth);
 
             try
             {
@@ -272,13 +284,24 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return true;
         }
 
-        public static async Task<string> AddTeam(GraphServiceClient graphClient, ILogger log, string groupId)
+        public static async Task<string> AddTeam(string groupId, string userName, string userSecret, ILogger log)
         {
             log.LogInformation("AddTeam received a request.");
 
             string teamId = string.Empty;
 
-            try {
+
+            // 2023-05-30T20:22:52.654 [Error] Message: Code: Forbidden
+            //Message: Failed to get license information for the user. Ensure user has a valid Office365 license assigned to them.Failed to get license information for the user. Ensure user has a valid Office365 license assigned to them.
+            // sv-caupdate@devgcx.ca
+
+            ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(userName, userSecret, log);
+            var graphClient = new GraphServiceClient(auth);
+
+
+
+            try
+            {
                 var team = new Team
                 {
                     MemberSettings = new TeamMemberSettings
@@ -315,16 +338,16 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return teamId;
         }
 
-        public static async Task<bool> ApplyTemplate(string sharePointUrl, string tenantName, string tenantId, string groupId, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsChannelId, ExecutionContext functionContext, ILogger log)
+        public static async Task<bool> ApplyTemplate(string sharePointUrl, string tenantName, string tenantId, string groupId, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsChannelId, string userName, string userSecret, ExecutionContext functionContext, ILogger log)
         {
             log.LogInformation("ApplyTemplate received a request.");
 
             try
             {
-                ROPCConfidentialTokenCredential token = new ROPCConfidentialTokenCredential(log);
+                ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(userName, userSecret, log);
                 var scopes = new string[] { $"https://{tenantName}.sharepoint.com/.default" };
                 var authManager = new PnP.Framework.AuthenticationManager();
-                var accessToken = await token.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
+                var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
                 var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
 
                 Web web = ctx.Web;

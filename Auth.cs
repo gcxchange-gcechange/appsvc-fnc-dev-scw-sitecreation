@@ -106,17 +106,51 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string _username;
             ILogger _log;
 
-            public ROPCConfidentialTokenCredential(ILogger log)
+            //public ROPCConfidentialTokenCredential(ILogger log)
+            //{
+            //    IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
+
+            //    string keyVaultUrl = config["keyVaultUrl"];
+            //    string secretName = config["secretName"];
+            //    string secretNamePassword = config["secretNamePassword"];
+
+            //    _clientId = config["clientId"];
+            //    _tenantId = config["tenantId"];
+            //    _username = config["user_name"];
+            //    _log = log;
+            //    _tokenEndpoint = "https://login.microsoftonline.com/" + _tenantId + "/oauth2/v2.0/token";
+
+            //    SecretClientOptions options = new SecretClientOptions()
+            //    {
+            //        Retry =
+            //    {
+            //        Delay= TimeSpan.FromSeconds(2),
+            //        MaxDelay = TimeSpan.FromSeconds(16),
+            //        MaxRetries = 5,
+            //        Mode = RetryMode.Exponential
+            //     }
+            //    };
+
+            //    var client = new SecretClient(new Uri(keyVaultUrl), new DefaultAzureCredential(), options);
+
+            //    KeyVaultSecret secret = client.GetSecret(secretName);
+            //    _clientSecret = secret.Value;
+
+            //    KeyVaultSecret password = client.GetSecret(secretNamePassword);
+            //    _password = password.Value;
+            //}
+
+            public ROPCConfidentialTokenCredential(string userName, string userSecretName, ILogger log)
             {
                 IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
 
                 string keyVaultUrl = config["keyVaultUrl"];
                 string secretName = config["secretName"];
-                string secretNamePassword = config["secretNamePassword"];
+                string secretNamePassword = userSecretName;
 
                 _clientId = config["clientId"];
                 _tenantId = config["tenantId"];
-                _username = config["user_name"];
+                _username = userName;
                 _log = log;
                 _tokenEndpoint = "https://login.microsoftonline.com/" + _tenantId + "/oauth2/v2.0/token";
 
@@ -139,6 +173,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 KeyVaultSecret password = client.GetSecret(secretNamePassword);
                 _password = password.Value;
             }
+
 
             public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
             {
