@@ -4,18 +4,14 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
-using System.Security.Policy;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Core;
-using Azure.Identity;
-using CamlBuilder;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.SharePoint.Client;
-using Microsoft.VisualBasic;
 using Newtonsoft.Json;
 using PnP.Framework.Provisioning.Connectors;
 using PnP.Framework.Provisioning.Model;
@@ -52,10 +48,14 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string descriptionFr = data?.SpaceDescriptionFR;
             string displayName = $"{data?.SpaceName} - {data?.SpaceNameFR}";
             string itemId = data?.Id;
-            string members = data?.Members;
+            //string members = data?.Members;
             string owners = data?.Owner1;
             string queueName = data?.SecurityCategory;
-            string requestId = data?.Id;
+            
+            
+            string requestId = string.Concat("1000", data?.Id);
+            //string requestId = data?.Id;
+
             string requesterEmail = data?.RequesterEmail;
             string requesterName = data?.RequesterName;
 
@@ -65,11 +65,17 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string delegatedSVUserName = config["user_name"];
             string delegatedSVUserSecret = config["secretNamePassword"];
 
-            // manipulated values
-            int newRequestId = Int32.Parse(requestId) + 500;    // offset to ensure unique Id
-            requestId = newRequestId.ToString();
-            string sharePointUrl = config["sharePointUrl"] + requestId;
 
+            // https://devgcx.sharepoint.com/teams/
+            // https://www.gcxgce.sharepoint.com/teams/1000#ITEMID#
+
+            // manipulated values
+            //int newRequestId = Int32.Parse(requestId) + 500;    // offset to ensure unique Id
+            //requestId = newRequestId.ToString();
+
+
+            string sharePointUrl = string.Concat(config["sharePointUrl"], requestId);
+           
             Auth auth = new Auth();
             var graphClient = auth.graphAuth(log);
 
@@ -174,7 +180,13 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             // make sure team site does not already exist
             HttpClient client = new HttpClient();
             var response = await client.GetAsync(sharePointUrl);
-            if (response.StatusCode != HttpStatusCode.NotFound)
+
+            //either option not making a difference: HttpCompletionOption.ResponseHeadersRead
+
+            // var response = await graphClient.Sites["{site-id}"].GetAsync();
+
+            log.LogInformation($"response.StatusCode: {response.StatusCode}");
+            if (response.StatusCode != HttpStatusCode.NotFound && response.StatusCode != HttpStatusCode.Forbidden)
                 return string.Empty;
 
             string groupId;
@@ -202,7 +214,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 log.LogError($"Message: {e.Message}");
                 if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
                 log.LogError($"StackTrace: {e.StackTrace}");
-
                 groupId = string.Empty;
             }
 
