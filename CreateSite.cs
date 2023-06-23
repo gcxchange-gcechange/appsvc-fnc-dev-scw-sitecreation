@@ -228,7 +228,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
             try {
                 await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = teamCreatorId });
-                await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = tempOwnerId });
+               // await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = tempOwnerId });
 
                 foreach (string email in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
                 {
