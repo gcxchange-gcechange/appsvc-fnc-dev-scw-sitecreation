@@ -59,11 +59,11 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string requesterEmail = data?.RequesterEmail;
             string requesterName = data?.RequesterName;
 
-            string delegatedListUserName = config["delegatedListUserName"];
-            string delegatedListUserSecret =  config["delegatedListUserSecret"];
+            string delegatedUserName = config["delegatedUserName"];
+            string delegatedUserSecret =  config["delegatedUserSecret"];
 
-            string delegatedSVUserName = config["user_name"];
-            string delegatedSVUserSecret = config["secretNamePassword"];
+          //  string delegatedSVUserName = config["user_name"];
+           // string delegatedSVUserSecret = config["secretNamePassword"];
 
 
             // https://devgcx.sharepoint.com/teams/
@@ -85,17 +85,17 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             if (groupId != string.Empty)
             {
                 //graphClient, 
-                await UpdateSiteUrl(delegatedListUserName, delegatedListUserSecret, sharePointUrl, siteId, listId, itemId, log);
+                await UpdateSiteUrl(delegatedUserName, delegatedUserSecret, sharePointUrl, siteId, listId, itemId, log);
 
                 await AddOwnersToGroup(graphClient, log, groupId, userId, ownerId, owners);
 
                 // wait 3 minutes to allow for provisioning
                 Thread.Sleep(3 * 60 * 1000);
 
-                var teamId = await AddTeam(groupId, delegatedSVUserName, delegatedSVUserSecret, log);
+                var teamId = await AddTeam(groupId, delegatedUserName, delegatedUserSecret, log);
                 log.LogInformation($"teamId: {teamId}");
 
-                await ApplyTemplate(sharePointUrl, tenantName, tenantId, groupId, descriptionEn, descriptionFr, followingContentFeatureId, teamsChannelId, delegatedSVUserName, delegatedSVUserSecret, functionContext, log);
+                await ApplyTemplate(sharePointUrl, tenantName, tenantId, groupId, descriptionEn, descriptionFr, followingContentFeatureId, teamsChannelId, delegatedUserName, delegatedUserSecret, functionContext, log);
 
                 // deferred functionality
                 //await AddMembersToTeam(graphClient, log, groupId, teamId, members);
