@@ -199,7 +199,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     DisplayName = $@"{displayName}",
                     GroupTypes = new List<String>() { "Unified" },
                     MailEnabled = true,
-                    MailNickname = requestId,
+                    MailNickname = "uat"+requestId,
                     SecurityEnabled = false,
                     Visibility = "Private",
                     AdditionalData = new Dictionary<string, object>
