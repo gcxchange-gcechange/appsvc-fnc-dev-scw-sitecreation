@@ -194,14 +194,23 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             try
             {
                 var o365Group = new Microsoft.Graph.Group
-               {
-                   Description = description,
-                   DisplayName = $@"{displayName}",
-                   GroupTypes = new List<String>() { "Unified" },
-                   MailEnabled = true,
-                   MailNickname = requestId,
-                   SecurityEnabled = false,
-                   Visibility = "Private"
+                {
+                    Description = description,
+                    DisplayName = $@"{displayName}",
+                    GroupTypes = new List<String>() { "Unified" },
+                    MailEnabled = true,
+                    MailNickname = requestId,
+                    SecurityEnabled = false,
+                    Visibility = "Private",
+                    AdditionalData = new Dictionary<string, object>
+                    {
+                        {
+                            "owners@odata.bind", new List<string>
+                            {
+                                "https://graph.microsoft.com/v1.0/users/"+userId,
+                            }
+                        },
+                    }
                 };
 
                 var result = await graphClient.Groups.Request().AddAsync(o365Group);
