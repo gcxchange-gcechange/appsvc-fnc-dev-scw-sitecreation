@@ -201,16 +201,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     MailEnabled = true,
                     MailNickname = "uat"+requestId,
                     SecurityEnabled = false,
-                    Visibility = "Private",
-                    AdditionalData = new Dictionary<string, object>
-                    {
-                        {
-                            "owners@odata.bind", new List<string>
-                            {
-                                "https://graph.microsoft.com/v1.0/users/"+userId,
-                            }
-                        },
-                    }
+                    Visibility = "Private"               
                 };
 
                 var result = await graphClient.Groups.Request().AddAsync(o365Group);
