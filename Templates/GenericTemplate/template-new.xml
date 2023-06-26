@@ -1424,11 +1424,11 @@
 				<pnp:File Src="SiteAssets/SitePages/News/1507457389-canada.png" Folder="SiteAssets/SitePages/News" Overwrite="true" Level="Published" />
 				<pnp:File Src="SiteAssets/SitePages/Events/652714532-canada.png" Folder="SiteAssets/SitePages/Events" Overwrite="true" Level="Published" />
 			</pnp:Files>
-			<pnp:ApplicationLifecycleManagement>
+			<!--<pnp:ApplicationLifecycleManagement>
 				<pnp:Apps>
 					<pnp:App AppId="763b92ea-069b-4212-8d61-744a6e8d070c" Action="Install" />
 				</pnp:Apps>
-			</pnp:ApplicationLifecycleManagement>
+			</pnp:ApplicationLifecycleManagement>-->
 
 			<pnp:ClientSidePages>
 
