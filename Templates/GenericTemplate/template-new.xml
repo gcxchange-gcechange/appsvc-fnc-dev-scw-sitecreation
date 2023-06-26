@@ -3,7 +3,7 @@
 	<pnp:Preferences Generator="PnP.Framework, Version=1.11.2.0, Culture=neutral, PublicKeyToken=0d501f89f11b748c" />
 	<pnp:Templates ID="CONTAINER-TEMPLATE-19AF1EC7646F4E0494D7934A8C82F992">
 		<pnp:ProvisioningTemplate ID="TEMPLATE-19AF1EC7646F4E0494D7934A8C82F992" Version="1" BaseSiteTemplate="GROUP#0" Scope="RootSite">
-			<pnp:WebSettings RequestAccessEmail="" NoCrawl="false" WelcomePage="SitePages/Home.aspx" SiteLogo="/teams/gaby-scwtemplatetest/_api/groupservice/getgroupimage?id='fce29a71-47f6-407e-87e8-f70ce5683c6f'" AlternateCSS="" MasterPageUrl="{masterpagecatalog}/seattle.master" CustomMasterPageUrl="{masterpagecatalog}/seattle.master" HubSiteUrl="{hosturl}/sites/communities" CommentsOnSitePagesDisabled="false" QuickLaunchEnabled="true" MembersCanShare="true" HorizontalQuickLaunch="true" SearchScope="DefaultScope" SearchBoxInNavBar="Inherit" />
+			<pnp:WebSettings RequestAccessEmail="" NoCrawl="false" WelcomePage="SitePages/Home.aspx" SiteLogo="" AlternateCSS="" MasterPageUrl="{masterpagecatalog}/seattle.master" CustomMasterPageUrl="{masterpagecatalog}/seattle.master" HubSiteUrl="{hosturl}/sites/communities" CommentsOnSitePagesDisabled="false" QuickLaunchEnabled="true" MembersCanShare="true" HorizontalQuickLaunch="true" SearchScope="DefaultScope" SearchBoxInNavBar="Inherit" />
 			<pnp:SiteSettings AllowDesigner="true" SearchBoxInNavBar="Inherit" SearchCenterUrl="" />
 			<pnp:RegionalSettings AdjustHijriDays="0" AlternateCalendarType="None" CalendarType="Gregorian" Collation="25" FirstDayOfWeek="Sunday" FirstWeekOfYear="0" LocaleId="1033" ShowWeeks="false" Time24="false" TimeZone="10" WorkDayEndHour="5:00PM" WorkDays="62" WorkDayStartHour="8:00AM" />
 			<pnp:SupportedUILanguages>
