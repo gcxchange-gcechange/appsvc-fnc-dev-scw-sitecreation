@@ -6,6 +6,15 @@
     <UserSecretsId>fe6be3d6-8ad8-4d3a-8f7d-5b5d1299e3cd</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="Templates\GenericTemplate\template-124.xml" />
+    <None Remove="Templates\GenericTemplate\template-125.xml" />
+    <None Remove="Templates\GenericTemplate\template-84.xml" />
+    <None Remove="Templates\GenericTemplate\template-92.xml" />
+    <None Remove="Templates\GenericTemplate\template-95.xml" />
+    <None Remove="Templates\GenericTemplate\template-name.xml" />
+    <None Remove="Templates\GenericTemplate\template.xml" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.4.0" />
     <PackageReference Include="Azure.Storage.Queues" Version="12.12.0" />
     <PackageReference Include="Microsoft.Azure.KeyVault" Version="3.0.5" />
@@ -59,22 +68,7 @@
     <None Update="Templates\GenericTemplate\SiteAssets\__siteIcon__.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="Templates\GenericTemplate\template-84.xml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="Templates\GenericTemplate\template-92.xml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="Templates\GenericTemplate\template-95.xml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="Templates\GenericTemplate\template-name.xml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="Templates\GenericTemplate\template-new.xml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="Templates\GenericTemplate\template.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
