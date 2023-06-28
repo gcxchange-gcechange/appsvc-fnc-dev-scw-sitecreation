@@ -71,31 +71,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             }
         }
 
-       
-        //internal static async Task<X509Certificate2> GetKeyVaultCertificateAsync(string keyVaultUrl, string name, ILogger log)
-        //{
-        //    log.LogInformation("GetKeyVaultCertificateAsync received a request.");
-
-        //    var serviceTokenProvider = new AzureServiceTokenProvider();
-        //    var keyVaultClient = new KeyVaultClient(new KeyVaultClient.AuthenticationCallback(serviceTokenProvider.KeyVaultTokenCallback));
-
-        //    SecretBundle secret = await keyVaultClient.GetSecretAsync(keyVaultUrl, name);
-        //    X509Certificate2 certificate = new X509Certificate2(Convert.FromBase64String(secret.Value), string.Empty, X509KeyStorageFlags.MachineKeySet);
-
-        //    log.LogInformation("GetKeyVaultCertificateAsync processed a request.");
-
-        //    return certificate;
-
-        //    // If you receive the following error when running the Function;
-        //    // Microsoft.Azure.WebJobs.Host.FunctionInvocationException:
-        //    // Exception while executing function: NotificationFunctions.QueueOperation--->
-        //    // System.Security.Cryptography.CryptographicException:
-        //    // The system cannot find the file specified.at System.Security.Cryptography.NCryptNative.ImportKey(SafeNCryptProviderHandle provider, Byte[] keyBlob, String format) at System.Security.Cryptography.CngKey.Import(Byte[] keyBlob, CngKeyBlobFormat format, CngProvider provider)
-        //    //
-        //    // Please see https://stackoverflow.com/questions/31685278/create-a-self-signed-certificate-in-net-using-an-azure-web-application-asp-ne
-        //    // Add the following Application setting to the AF "WEBSITE_LOAD_USER_PROFILE = 1"
-        //}
-
         public class ROPCConfidentialTokenCredential : Azure.Core.TokenCredential
         {
             string _clientId;
@@ -105,40 +80,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string _tokenEndpoint;
             string _username;
             ILogger _log;
-
-            //public ROPCConfidentialTokenCredential(ILogger log)
-            //{
-            //    IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
-
-            //    string keyVaultUrl = config["keyVaultUrl"];
-            //    string secretName = config["secretName"];
-            //    string secretNamePassword = config["secretNamePassword"];
-
-            //    _clientId = config["clientId"];
-            //    _tenantId = config["tenantId"];
-            //    _username = config["user_name"];
-            //    _log = log;
-            //    _tokenEndpoint = "https://login.microsoftonline.com/" + _tenantId + "/oauth2/v2.0/token";
-
-            //    SecretClientOptions options = new SecretClientOptions()
-            //    {
-            //        Retry =
-            //    {
-            //        Delay= TimeSpan.FromSeconds(2),
-            //        MaxDelay = TimeSpan.FromSeconds(16),
-            //        MaxRetries = 5,
-            //        Mode = RetryMode.Exponential
-            //     }
-            //    };
-
-            //    var client = new SecretClient(new Uri(keyVaultUrl), new DefaultAzureCredential(), options);
-
-            //    KeyVaultSecret secret = client.GetSecret(secretName);
-            //    _clientSecret = secret.Value;
-
-            //    KeyVaultSecret password = client.GetSecret(secretNamePassword);
-            //    _password = password.Value;
-            //}
 
             public ROPCConfidentialTokenCredential(string userName, string userSecretName, ILogger log)
             {
