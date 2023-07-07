@@ -21,6 +21,11 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 string serializedMessage = JsonConvert.SerializeObject(listItem.Fields.AdditionalData);
 
+
+                log.LogInformation($"serializedMessage = {serializedMessage}");
+
+
+
                 CloudQueueMessage message = new CloudQueueMessage(serializedMessage);
                 await queue.AddMessageAsync(message);
             }

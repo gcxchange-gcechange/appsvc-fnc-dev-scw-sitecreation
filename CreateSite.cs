@@ -25,6 +25,8 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 {
     public class CreateSite
     {
+        private static string teamsUrl = string.Empty;
+
         [FunctionName("CreateSite")]
         public static async Task RunAsync([QueueTrigger("sitecreation", Connection = "AzureWebJobsStorage")]string myQueueItem, ILogger log, ExecutionContext functionContext)
         {
@@ -33,27 +35,15 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             // assign variables from config
             IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
             string connectionString = config["AzureWebJobsStorage"];
+            string creatorId = config["ownerId"];
             string delegatedUserName = config["delegatedUserName"];
             string delegatedUserSecret = config["delegatedUserSecret"];
-
-
-
-
             string followingContentFeatureId = config["followingContentFeatureId"];
             string listId = config["listId"];
-
             string siteId = config["siteId"];
-            string teamsChannelId = config["teamsChannelId"];
+            //string teamsChannelId = config["teamsChannelId"];
             string tenantId = config["tenantId"];
             string tenantName = config["tenantName"];
-
-
-            string ownerId = config["ownerId"];
-            string creatorId = config["ownerId"];
-            //string teamCreatorId = config["userId"];
-
-
-
 
             // assign variables from queue
             dynamic data = JsonConvert.DeserializeObject(myQueueItem);
@@ -70,25 +60,25 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             // - take id from SharePoint list and append prefix to use as part of url
             string sitePath = string.Concat("1000", itemId);
             string sharePointUrl = string.Concat(config["sharePointUrl"], sitePath);
-           
+
             Auth auth = new Auth();
             var graphClient = auth.graphAuth(log);
 
-            var groupId = await CheckAndCreateGroup(graphClient, sharePointUrl, sitePath, displayName, descriptionEn, creatorId, log);
+            var groupId = await CheckAndCreateGroup(graphClient, sharePointUrl, sitePath, displayName, descriptionEn, creatorId, owners, log);
 
             if (groupId != string.Empty)
             {
                 await UpdateSiteUrl(delegatedUserName, delegatedUserSecret, sharePointUrl, siteId, listId, itemId, log);
-                
-                await AddOwnersToGroup(graphClient, log, groupId, creatorId, ownerId, owners);
+
+                //await AddOwnersToGroup(graphClient, log, groupId, creatorId, owners);
 
                 // wait 3 minutes to allow for provisioning
                 Thread.Sleep(3 * 60 * 1000);
 
-                var teamId = await AddTeam(groupId, delegatedUserName, delegatedUserSecret, log);
+                var teamId = await AddTeam(groupId, tenantId, delegatedUserName, delegatedUserSecret, log);
 
-                await ApplyTemplate(sharePointUrl, tenantName, tenantId, groupId, descriptionEn, descriptionFr, followingContentFeatureId, teamsChannelId, delegatedUserName, delegatedUserSecret, functionContext, log);
-              
+                await ApplyTemplate(sharePointUrl, tenantName, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, delegatedUserName, delegatedUserSecret, functionContext, log);
+
                 // deferred functionality
                 //await AddMembersToTeam(graphClient, log, groupId, teamId, members);
 
@@ -161,7 +151,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return string.Empty;
         }
 
-        public static async Task<string> CheckAndCreateGroup(GraphServiceClient graphClient, string sharePointUrl, string sitePath, string displayName, string description, string creatorId, ILogger log)
+        public static async Task<string> CheckAndCreateGroup(GraphServiceClient graphClient, string sharePointUrl, string sitePath, string displayName, string description, string creatorId, string owners, ILogger log)
         {
             log.LogInformation($"CreateGroup received a request.");
             log.LogInformation($"sharePointUrl: {sharePointUrl}");
@@ -178,6 +168,17 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
             try
             {
+                List<string> ownerList = new List<string>
+                {
+                    $"https://graph.microsoft.com/v1.0/users/{creatorId}"
+                };
+
+                foreach (string email in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var user = await graphClient.Users[email].Request().GetAsync();
+                    ownerList.Add($"https://graph.microsoft.com/v1.0/users/{user.Id}");
+                }
+
                 var o365Group = new Microsoft.Graph.Group
                 {
                     Description = description,
@@ -186,7 +187,11 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     MailEnabled = true,
                     MailNickname = sitePath,
                     SecurityEnabled = false,
-                    Visibility = "Private"
+                    Visibility = "Private",
+                    AdditionalData = new Dictionary<string, object>
+                    {
+                        {"owners@odata.bind" , ownerList}
+                    }               
                 };
 
                 var result = await graphClient.Groups.Request().AddAsync(o365Group);
@@ -207,32 +212,32 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return groupId;
         }
 
-        public static async Task<bool> AddOwnersToGroup(GraphServiceClient graphClient, ILogger log, string groupId, string creatorId, string tempOwnerId, string owners)
-        {
-            log.LogInformation("AddOwnersToGroup received a request.");
+        //public static async Task<bool> AddOwnersToGroup(GraphServiceClient graphClient, ILogger log, string groupId, string creatorId, string owners)
+        //{
+        //    log.LogInformation("AddOwnersToGroup received a request.");
 
-            try
-            {
-                await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = creatorId });
+        //    try
+        //    {
+        //        await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = creatorId });
 
-                foreach (string email in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var user = await graphClient.Users[email].Request().GetAsync();
-                    var id = user.Id;
-                    await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = id });
-                }
-            }
-            catch (Exception e)
-            {
-                log.LogError($"Message: {e.Message}");
-                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
-                log.LogError($"StackTrace: {e.StackTrace}");
-            }
+        //        foreach (string email in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
+        //        {
+        //            var user = await graphClient.Users[email].Request().GetAsync();
+        //            var id = user.Id;
+        //            await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = id });
+        //        }
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        log.LogError($"Message: {e.Message}");
+        //        if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+        //        log.LogError($"StackTrace: {e.StackTrace}");
+        //    }
 
-            log.LogInformation("AddOwnersToGroup processed a request.");
+        //    log.LogInformation("AddOwnersToGroup processed a request.");
 
-            return true;
-        }
+        //    return true;
+        //}
 
         public static async Task<bool> AddMembersToTeam(GraphServiceClient graphClient, ILogger log, string groupId, string teamId, string Members)
         {
@@ -280,7 +285,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return true;
         }
 
-        public static async Task<string> AddTeam(string groupId, string userName, string userSecret, ILogger log)
+        public static async Task<string> AddTeam(string groupId, string tenantId, string userName, string userSecret, Microsoft.Extensions.Logging.ILogger log)
         {
             log.LogInformation("AddTeam received a request.");
 
@@ -311,6 +316,15 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 var t = await graphClient.Groups[groupId].Team.Request().PutAsync(team);
                 teamId = t.Id;
+
+                var channels = await graphClient.Teams[teamId].Channels.Request().GetAsync();
+                var channelId = "";
+                foreach (var channel in channels)
+                {
+                    channelId = channel.Id;
+                }
+                teamsUrl = $@"https://teams.microsoft.com/l/team/{channelId}/conversations?groupId={teamId}&tenantId={tenantId}";
+                log.LogInformation($"teamsUrl = {teamsUrl}");
             }
             catch (Exception e)
             {
@@ -326,7 +340,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return teamId;
         }
 
-        public static async Task<bool> ApplyTemplate(string sharePointUrl, string tenantName, string tenantId, string groupId, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsChannelId, string userName, string userSecret, ExecutionContext functionContext, ILogger log)
+        public static async Task<bool> ApplyTemplate(string sharePointUrl, string tenantName, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsUrl, string userName, string userSecret, ExecutionContext functionContext, ILogger log)
         {
             log.LogInformation("ApplyTemplate received a request.");
 
@@ -337,6 +351,15 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 var authManager = new PnP.Framework.AuthenticationManager();
                 var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
                 var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
+
+                //IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
+                //string aadApplicationId = config["clientId"];
+                //string certificateName = config["certificateName"];
+                //string keyVaultUrl = config["keyVaultUrl"];
+
+                //X509Certificate2 mycert = await Auth.GetKeyVaultCertificateAsync(keyVaultUrl, certificateName, log);
+                //AuthenticationManager auth = new AuthenticationManager(aadApplicationId, mycert, $"{tenantName}.onmicrosoft.com");
+                //ClientContext ctx = await auth.GetContextAsync(sharePointUrl);
 
                 Web web = ctx.Web;
                 ctx.Load(web, w => w.Title);
@@ -379,7 +402,10 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     ProgressDelegate = (message, progress, total) =>
                     {
                         log.LogInformation(string.Format("{0:00}/{1:00} - {2} : {3}", progress, total, message, web.Title));
-                    }
+                    }//,
+                    //PersistTemplateInfo = true
+                    //IgnoreDuplicateDataRowErrors
+                    //ClearNavigation
                 };
 
                 FileSystemConnector connector = new FileSystemConnector(schemaDir, "");
@@ -387,7 +413,8 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 template.Parameters.Add("DescriptionEn", descriptionEn);
                 template.Parameters.Add("DescriptionFr", descriptionFr);
-                template.Parameters.Add("MSTeamsUrl", $"https://teams.microsoft.com/_#/l/team/{teamsChannelId}/conversations?groupId={groupId}&amp;tenantId={tenantId}");
+                template.Parameters.Add("HubSiteUrl", "https://devgcx.sharepoint.com/sites/communities");
+                template.Parameters.Add("MSTeamsUrl", teamsUrl);
 
                 log.LogInformation("ApplyProvisioningTemplate...");
                 try

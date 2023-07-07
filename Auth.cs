@@ -71,6 +71,30 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             }
         }
 
+        internal static async Task<X509Certificate2> GetKeyVaultCertificateAsync(string keyVaultUrl, string name, ILogger log)
+        {
+            log.LogInformation("GetKeyVaultCertificateAsync received a request.");
+
+            var serviceTokenProvider = new AzureServiceTokenProvider();
+            var keyVaultClient = new KeyVaultClient(new KeyVaultClient.AuthenticationCallback(serviceTokenProvider.KeyVaultTokenCallback));
+
+            SecretBundle secret = await keyVaultClient.GetSecretAsync(keyVaultUrl, name);
+            X509Certificate2 certificate = new X509Certificate2(Convert.FromBase64String(secret.Value), string.Empty, X509KeyStorageFlags.MachineKeySet);
+
+            log.LogInformation("GetKeyVaultCertificateAsync processed a request.");
+
+            return certificate;
+
+            // If you receive the following error when running the Function;
+            // Microsoft.Azure.WebJobs.Host.FunctionInvocationException:
+            // Exception while executing function: NotificationFunctions.QueueOperation--->
+            // System.Security.Cryptography.CryptographicException:
+            // The system cannot find the file specified.at System.Security.Cryptography.NCryptNative.ImportKey(SafeNCryptProviderHandle provider, Byte[] keyBlob, String format) at System.Security.Cryptography.CngKey.Import(Byte[] keyBlob, CngKeyBlobFormat format, CngProvider provider)
+            //
+            // Please see https://stackoverflow.com/questions/31685278/create-a-self-signed-certificate-in-net-using-an-azure-web-application-asp-ne
+            // Add the following Application setting to the AF "WEBSITE_LOAD_USER_PROFILE = 1"
+        }
+
         public class ROPCConfidentialTokenCredential : Azure.Core.TokenCredential
         {
             string _clientId;
@@ -114,7 +138,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 KeyVaultSecret password = client.GetSecret(secretNamePassword);
                 _password = password.Value;
             }
-
 
             public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
             {

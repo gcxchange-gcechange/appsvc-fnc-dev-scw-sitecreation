@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<pnp:Provisioning xmlns:pnp="http://schemas.dev.office.com/PnP/2022/09/ProvisioningSchema">
+  <pnp:Preferences Generator="PnP.Framework, Version=1.11.2.0, Culture=neutral, PublicKeyToken=0d501f89f11b748c" />
+  <pnp:Templates ID="CONTAINER-TEMPLATE-9F44DF8783BE459AB9A8C61CECC2F2EC">
+    <pnp:ProvisioningTemplate ID="TEMPLATE-9F44DF8783BE459AB9A8C61CECC2F2EC" Version="1" BaseSiteTemplate="GROUP#0" Scope="RootSite">
+		<pnp:WebSettings HubSiteUrl="{parameter:HubSiteUrl}" />
+   </pnp:ProvisioningTemplate>
+  </pnp:Templates>
+</pnp:Provisioning>
