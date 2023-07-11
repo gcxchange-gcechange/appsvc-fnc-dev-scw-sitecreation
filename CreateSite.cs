@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.SharePoint.Client;
 using Newtonsoft.Json;
+using PnP.Framework.Http;
 using PnP.Framework.Provisioning.Connectors;
 using PnP.Framework.Provisioning.Model;
 using PnP.Framework.Provisioning.ObjectHandlers;
@@ -449,5 +450,41 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
             return true;
         }
+
+
+        public static async Task SiteToHubAssociation(string sharePointUrl, string hubSiteId, ILogger log)
+        {
+            IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
+            string delegatedUserName = config["delegatedUserName"];
+            string delegatedUserSecret = config["delegatedUserSecret"];
+            string tenantName = config["tenantName"];
+            //string sharePointUrl = "https://devgcx.sharepoint.com/teams/1000756";
+
+            ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(delegatedUserName, delegatedUserSecret, log);
+            var scopes = new string[] { $"https://{tenantName}.sharepoint.com/.default" };
+            var authManager = new PnP.Framework.AuthenticationManager();
+            var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
+            var siteCtx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
+
+
+            //Guid hubsite = new Guid("af056a4a-5957-4858-8074-c8fb2e7129fd");
+
+            log.LogDebug("Site {siteurl} will be associated with hub {hubsiteID}", siteCtx.Url, hubSiteId);
+            var pnpclient = PnPHttpClient.Instance.GetHttpClient(siteCtx);
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, $"{siteCtx.Url}/_api/site/JoinHubSite('{hubSiteId}')")
+            {
+                Content = null
+            };
+            request.Headers.Add("accept", "application/json;odata.metadata=none");
+            request.Headers.Add("odata-version", "4.0");
+            await PnPHttpClient.AuthenticateRequestAsync(request, siteCtx).ConfigureAwait(false);
+            HttpResponseMessage response = await pnpclient.SendAsync(request, new System.Threading.CancellationToken());
+            if (!response.IsSuccessStatusCode)
+                throw new Exception($"Site to hub association failed: {response.StatusCode}");
+            log.LogDebug("Site {siteurl} was successfully associated with hub {hubsiteID}", siteCtx.Url, hubSiteId);
+        }
+
+
+
     }
 }
