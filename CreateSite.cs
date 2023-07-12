@@ -40,9 +40,9 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string delegatedUserName = config["delegatedUserName"];
             string delegatedUserSecret = config["delegatedUserSecret"];
             string followingContentFeatureId = config["followingContentFeatureId"];
+            string hubSiteId = config["hubSiteId"];
             string listId = config["listId"];
             string siteId = config["siteId"];
-            //string teamsChannelId = config["teamsChannelId"];
             string tenantId = config["tenantId"];
             string tenantName = config["tenantName"];
 
@@ -69,16 +69,22 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
             if (groupId != string.Empty)
             {
-                await UpdateSiteUrl(delegatedUserName, delegatedUserSecret, sharePointUrl, siteId, listId, itemId, log);
+                ROPCConfidentialTokenCredential tokenCredential = new ROPCConfidentialTokenCredential(delegatedUserName, delegatedUserSecret, log);
+                var scopes = new string[] { $"https://{tenantName}.sharepoint.com/.default" };
+                var authManager = new PnP.Framework.AuthenticationManager();
+                var accessToken = await tokenCredential.GetTokenAsync(new TokenRequestContext(scopes), new CancellationToken());
+                var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
 
-                //await AddOwnersToGroup(graphClient, log, groupId, creatorId, owners);
+                await UpdateSiteUrl(tokenCredential, sharePointUrl, siteId, listId, itemId, log);
 
                 // wait 3 minutes to allow for provisioning
                 Thread.Sleep(3 * 60 * 1000);
 
                 var teamId = await AddTeam(groupId, tenantId, delegatedUserName, delegatedUserSecret, log);
+                
+                await SiteToHubAssociation(ctx, hubSiteId, log);
 
-                await ApplyTemplate(sharePointUrl, tenantName, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, delegatedUserName, delegatedUserSecret, functionContext, log);
+                await ApplyTemplate(ctx, sharePointUrl, tenantName, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, functionContext, log);
 
                 // deferred functionality
                 //await AddMembersToTeam(graphClient, log, groupId, teamId, members);
@@ -120,12 +126,12 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return true;
         }
 
-        public static async Task<string> UpdateSiteUrl(string userName, string userSecret, string sharePointUrl, string siteId, string listId, string itemId, ILogger log)
+        public static async Task<string> UpdateSiteUrl(ROPCConfidentialTokenCredential tokenCredential, string sharePointUrl, string siteId, string listId, string itemId, ILogger log)
         {
             log.LogInformation("UpdateSiteUrl received a request.");
 
-            ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(userName, userSecret, log);
-            var graphClient = new GraphServiceClient(auth);
+            //ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(userName, userSecret, log);
+            var graphClient = new GraphServiceClient(tokenCredential);
 
             try
             {
@@ -212,34 +218,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
             return groupId;
         }
-
-        //public static async Task<bool> AddOwnersToGroup(GraphServiceClient graphClient, ILogger log, string groupId, string creatorId, string owners)
-        //{
-        //    log.LogInformation("AddOwnersToGroup received a request.");
-
-        //    try
-        //    {
-        //        await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = creatorId });
-
-        //        foreach (string email in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
-        //        {
-        //            var user = await graphClient.Users[email].Request().GetAsync();
-        //            var id = user.Id;
-        //            await graphClient.Groups[groupId].Owners.References.Request().AddAsync(new DirectoryObject { Id = id });
-        //        }
-        //    }
-        //    catch (Exception e)
-        //    {
-        //        log.LogError($"Message: {e.Message}");
-        //        if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
-        //        log.LogError($"StackTrace: {e.StackTrace}");
-        //    }
-
-        //    log.LogInformation("AddOwnersToGroup processed a request.");
-
-        //    return true;
-        //}
-
+     
         public static async Task<bool> AddMembersToTeam(GraphServiceClient graphClient, ILogger log, string groupId, string teamId, string Members)
         {
             log.LogInformation("AddMembersToTeam received a request.");
@@ -341,27 +320,12 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return teamId;
         }
 
-        public static async Task<bool> ApplyTemplate(string sharePointUrl, string tenantName, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsUrl, string userName, string userSecret, ExecutionContext functionContext, ILogger log)
+        public static async Task<bool> ApplyTemplate(ClientContext ctx, string sharePointUrl, string tenantName, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsUrl, ExecutionContext functionContext, ILogger log)
         {
             log.LogInformation("ApplyTemplate received a request.");
 
             try
             {
-                ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(userName, userSecret, log);
-                var scopes = new string[] { $"https://{tenantName}.sharepoint.com/.default" };
-                var authManager = new PnP.Framework.AuthenticationManager();
-                var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
-                var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
-
-                //IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
-                //string aadApplicationId = config["clientId"];
-                //string certificateName = config["certificateName"];
-                //string keyVaultUrl = config["keyVaultUrl"];
-
-                //X509Certificate2 mycert = await Auth.GetKeyVaultCertificateAsync(keyVaultUrl, certificateName, log);
-                //AuthenticationManager auth = new AuthenticationManager(aadApplicationId, mycert, $"{tenantName}.onmicrosoft.com");
-                //ClientContext ctx = await auth.GetContextAsync(sharePointUrl);
-
                 Web web = ctx.Web;
                 ctx.Load(web, w => w.Title);
                 ctx.ExecuteQuery();
@@ -414,7 +378,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 template.Parameters.Add("DescriptionEn", descriptionEn);
                 template.Parameters.Add("DescriptionFr", descriptionFr);
-                template.Parameters.Add("HubSiteUrl", "https://devgcx.sharepoint.com/sites/communities");
                 template.Parameters.Add("MSTeamsUrl", teamsUrl);
 
                 log.LogInformation("ApplyProvisioningTemplate...");
@@ -451,40 +414,35 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return true;
         }
 
-
-        public static async Task SiteToHubAssociation(string sharePointUrl, string hubSiteId, ILogger log)
+        public static async Task SiteToHubAssociation(ClientContext ctx, string hubSiteId, ILogger log)
         {
-            IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
-            string delegatedUserName = config["delegatedUserName"];
-            string delegatedUserSecret = config["delegatedUserSecret"];
-            string tenantName = config["tenantName"];
-            //string sharePointUrl = "https://devgcx.sharepoint.com/teams/1000756";
+            log.LogInformation("SiteToHubAssociation received a request.");
+            log.LogInformation("Site {siteurl} will be associated with hub {hubsiteID}", ctx.Url, hubSiteId);
 
-            ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(delegatedUserName, delegatedUserSecret, log);
-            var scopes = new string[] { $"https://{tenantName}.sharepoint.com/.default" };
-            var authManager = new PnP.Framework.AuthenticationManager();
-            var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
-            var siteCtx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
-
-
-            //Guid hubsite = new Guid("af056a4a-5957-4858-8074-c8fb2e7129fd");
-
-            log.LogDebug("Site {siteurl} will be associated with hub {hubsiteID}", siteCtx.Url, hubSiteId);
-            var pnpclient = PnPHttpClient.Instance.GetHttpClient(siteCtx);
-            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, $"{siteCtx.Url}/_api/site/JoinHubSite('{hubSiteId}')")
+            try
             {
-                Content = null
-            };
-            request.Headers.Add("accept", "application/json;odata.metadata=none");
-            request.Headers.Add("odata-version", "4.0");
-            await PnPHttpClient.AuthenticateRequestAsync(request, siteCtx).ConfigureAwait(false);
-            HttpResponseMessage response = await pnpclient.SendAsync(request, new System.Threading.CancellationToken());
-            if (!response.IsSuccessStatusCode)
-                throw new Exception($"Site to hub association failed: {response.StatusCode}");
-            log.LogDebug("Site {siteurl} was successfully associated with hub {hubsiteID}", siteCtx.Url, hubSiteId);
+                var pnpclient = PnPHttpClient.Instance.GetHttpClient(ctx);
+                HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, $"{ctx.Url}/_api/site/JoinHubSite('{hubSiteId}')")
+                {
+                    Content = null
+                };
+                request.Headers.Add("accept", "application/json;odata.metadata=none");
+                request.Headers.Add("odata-version", "4.0");
+
+                await PnPHttpClient.AuthenticateRequestAsync(request, ctx).ConfigureAwait(false);
+
+                HttpResponseMessage response = await pnpclient.SendAsync(request, new CancellationToken());
+
+                log.LogInformation("Site {siteurl} was successfully associated with hub {hubsiteID}", ctx.Url, hubSiteId);
+            }
+            catch (Exception e)
+            {
+                log.LogError($"Exception: {e.Message}");
+                if (e.InnerException is not null)
+                    log.LogError($"InnerException: {e.InnerException.Message}");
+            }
+
+            log.LogInformation("SiteToHubAssociation processed a request.");
         }
-
-
-
     }
 }

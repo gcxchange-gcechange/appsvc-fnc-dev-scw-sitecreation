@@ -6,6 +6,14 @@
     <UserSecretsId>fe6be3d6-8ad8-4d3a-8f7d-5b5d1299e3cd</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="ApplyTemplateOliver.cs" />
+    <Compile Remove="ApplyTheTemplate.cs" />
+    <Compile Remove="Groups.cs" />
+    <Compile Remove="HubSite.cs" />
+    <Compile Remove="HubSiteCSOM.cs" />
+    <Compile Remove="TestHubSite.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <None Remove="Templates\GenericTemplate\template-124.xml" />
     <None Remove="Templates\GenericTemplate\template-125.xml" />
     <None Remove="Templates\GenericTemplate\template-84.xml" />
