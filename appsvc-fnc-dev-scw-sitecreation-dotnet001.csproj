@@ -6,6 +6,14 @@
     <UserSecretsId>fe6be3d6-8ad8-4d3a-8f7d-5b5d1299e3cd</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="ApplyTemplateOliver.cs" />
+    <Compile Remove="ApplyTheTemplate.cs" />
+    <Compile Remove="Groups.cs" />
+    <Compile Remove="HubSite.cs" />
+    <Compile Remove="HubSiteCSOM.cs" />
+    <Compile Remove="TestHubSite.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <None Remove="Templates\GenericTemplate\template-124.xml" />
     <None Remove="Templates\GenericTemplate\template-125.xml" />
     <None Remove="Templates\GenericTemplate\template-84.xml" />
@@ -25,6 +33,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
     <PackageReference Include="Microsoft.Graph" Version="4.51.0" />
     <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="4.1.3" />
+    <PackageReference Include="Microsoft.SharePointOnline.CSOM" Version="16.1.23814.12000" />
     <PackageReference Include="PnP.Framework" Version="1.11.0" />
   </ItemGroup>
   <ItemGroup>
@@ -66,6 +75,12 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Templates\GenericTemplate\SiteAssets\__siteIcon__.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\GenericTemplate\template-oliver.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\GenericTemplate\template-gabytest.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Templates\GenericTemplate\template-new.xml">
