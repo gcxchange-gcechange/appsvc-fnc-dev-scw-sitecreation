@@ -50,15 +50,16 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             dynamic data = JsonConvert.DeserializeObject(myQueueItem);
             string descriptionEn = data?.SpaceDescription;
             string descriptionFr = data?.SpaceDescriptionFR;
-            string displayName = $"{data?.SpaceName} - {data?.SpaceNameFR}";
             string itemId = data?.Id;
             string owners = data?.Owner1;
             string queueName = data?.SecurityCategory;
             string requesterEmail = data?.RequesterEmail;
             string requesterName = data?.RequesterName;
+            string SpaceNameEn = data?.SpaceName;
+            string SpaceNameFr = data?.SpaceNameFR;
 
             // manipulated values
-            // - take id from SharePoint list and append prefix to use as part of url
+            string displayName = $"{SpaceNameEn} - {SpaceNameFr}";
             string sitePath = string.Concat("1000", itemId);
             string sharePointUrl = string.Concat(config["sharePointUrl"], sitePath);
 
@@ -89,7 +90,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 // deferred functionality
                 //await AddMembersToTeam(graphClient, log, groupId, teamId, members);
 
-                await AddToSensitivityQueue(connectionString, queueName, itemId, sitePath, groupId, displayName, requesterName, requesterEmail, log);
+                await AddToSensitivityQueue(connectionString, queueName, itemId, sitePath, groupId, SpaceNameEn, SpaceNameFr, requesterName, requesterEmail, log);
             }
             else
             {
@@ -99,7 +100,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             log.LogInformation("CreateSite trigger function processed a request.");
         }
 
-        public static async Task<bool> AddToSensitivityQueue(string connectionString, string queueName, string itemId, string sitePath, string groupId, string DisplayName, string RequesterName, string RequesterEmail, ILogger log)
+        public static async Task<bool> AddToSensitivityQueue(string connectionString, string queueName, string itemId, string sitePath, string groupId, string SpaceNameEn, string SpaceNameFr, string RequesterName, string RequesterEmail, ILogger log)
         {
             log.LogInformation("AddToSensitivityQueue received a request.");
 
@@ -112,7 +113,8 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                         {"Id", sitePath},
                         {"itemId", itemId},
                         {"groupId", groupId},
-                        {"DisplayName", DisplayName},
+                        {"SpaceName", SpaceNameEn},
+                        {"SpaceNameFR", SpaceNameFr},
                         {"RequesterName", RequesterName},
                         {"RequesterEmail", RequesterEmail}
                     }
