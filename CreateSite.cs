@@ -82,7 +82,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 Thread.Sleep(3 * 60 * 1000);
 
                 var teamId = await AddTeam(groupId, tenantId, delegatedUserName, delegatedUserSecret, log);
-                
+
                 await SiteToHubAssociation(ctx, hubSiteId, log);
 
                 await ApplyTemplate(ctx, sharePointUrl, tenantName, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, functionContext, log);
@@ -184,8 +184,11 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 foreach (string email in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    var user = await graphClient.Users[email].Request().GetAsync();
-                    ownerList.Add($"https://graph.microsoft.com/v1.0/users/{user.Id}");
+                    log.LogInformation($"email = {email}");
+                    var user = await graphClient.Users.Request().Filter($"mail eq '{email}'").GetAsync();
+                    var Id = user[0].Id;
+                    log.LogInformation($"Id = {Id}");
+                    ownerList.Add($"https://graph.microsoft.com/v1.0/users/{Id}");
                 }
 
                 var o365Group = new Microsoft.Graph.Group
@@ -220,52 +223,52 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
             return groupId;
         }
-     
-        public static async Task<bool> AddMembersToTeam(GraphServiceClient graphClient, ILogger log, string groupId, string teamId, string Members)
-        {
-            log.LogInformation("AddMembersToTeam received a request.");
 
-            try
-            {
-                foreach (string email in Members.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var user  = await graphClient.Users[email].Request().GetAsync();
-                    var memberId = user.Id;
+        //public static async Task<bool> AddMembersToTeam(GraphServiceClient graphClient, ILogger log, string groupId, string teamId, string Members)
+        //{
+        //    log.LogInformation("AddMembersToTeam received a request.");
 
-                    log.LogInformation($"email: {email}");
-                    log.LogInformation($"memberId: {memberId}");
+        //    try
+        //    {
+        //        foreach (string email in Members.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
+        //        {
+        //            var user  = await graphClient.Users[email].Request().GetAsync();
+        //            var memberId = user.Id;
 
-                    var directoryObject = new DirectoryObject
-                    {
-                        Id = memberId
-                    };
-                    await graphClient.Groups[groupId].Members.References.Request().AddAsync(directoryObject);
+        //            log.LogInformation($"email: {email}");
+        //            log.LogInformation($"memberId: {memberId}");
 
-                    AadUserConversationMember mem = new AadUserConversationMember
-                    {
-                        Roles = new List<String>()
-                        {
-                            "member"
-                        },
-                        AdditionalData = new Dictionary<string, object>()
-                        {
-                            {"user@odata.bind", $"https://graph.microsoft.com/v1.0/users('{memberId}')"}
-                        }
-                    };
-                    await graphClient.Teams[teamId].Members.Request().AddAsync(mem);
-                }
-            }
-            catch (Exception e)
-            {
-                log.LogError($"Message: {e.Message}");
-                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
-                log.LogError($"StackTrace: {e.StackTrace}");
-            }
+        //            var directoryObject = new DirectoryObject
+        //            {
+        //                Id = memberId
+        //            };
+        //            await graphClient.Groups[groupId].Members.References.Request().AddAsync(directoryObject);
 
-           log.LogInformation("AddMembersToTeam processed a request.");
+        //            AadUserConversationMember mem = new AadUserConversationMember
+        //            {
+        //                Roles = new List<String>()
+        //                {
+        //                    "member"
+        //                },
+        //                AdditionalData = new Dictionary<string, object>()
+        //                {
+        //                    {"user@odata.bind", $"https://graph.microsoft.com/v1.0/users('{memberId}')"}
+        //                }
+        //            };
+        //            await graphClient.Teams[teamId].Members.Request().AddAsync(mem);
+        //        }
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        log.LogError($"Message: {e.Message}");
+        //        if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+        //        log.LogError($"StackTrace: {e.StackTrace}");
+        //    }
 
-            return true;
-        }
+        //   log.LogInformation("AddMembersToTeam processed a request.");
+
+        //    return true;
+        //}
 
         public static async Task<string> AddTeam(string groupId, string tenantId, string userName, string userSecret, Microsoft.Extensions.Logging.ILogger log)
         {
