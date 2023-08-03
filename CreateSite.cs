@@ -85,7 +85,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 
                 await SiteToHubAssociation(ctx, hubSiteId, log);
 
-                await ApplyTemplate(ctx, sharePointUrl, tenantName, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, functionContext, log);
+                await ApplyTemplate(ctx, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, functionContext, log);
 
                 // deferred functionality
                 //await AddMembersToTeam(graphClient, log, groupId, teamId, members);
@@ -132,7 +132,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
         {
             log.LogInformation("UpdateSiteUrl received a request.");
 
-            //ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(userName, userSecret, log);
             var graphClient = new GraphServiceClient(tokenCredential);
 
             try
@@ -305,7 +304,8 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 {
                     channelId = channel.Id;
                 }
-                teamsUrl = $@"https://teams.microsoft.com/l/team/{channelId}/conversations?groupId={teamId}&tenantId={tenantId}";
+
+                teamsUrl = $@"https://teams.microsoft.com/#/l/team/{channelId}/conversations?groupId={teamId}&tenantId={tenantId}";
                 log.LogInformation($"teamsUrl = {teamsUrl}");
             }
             catch (Exception e)
@@ -322,7 +322,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return teamId;
         }
 
-        public static async Task<bool> ApplyTemplate(ClientContext ctx, string sharePointUrl, string tenantName, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsUrl, ExecutionContext functionContext, ILogger log)
+        public static async Task<bool> ApplyTemplate(ClientContext ctx, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsUrl, ExecutionContext functionContext, ILogger log)
         {
             log.LogInformation("ApplyTemplate received a request.");
 
