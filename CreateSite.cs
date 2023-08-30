@@ -59,6 +59,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string SpaceNameFr = data?.SpaceNameFR;
 
             // manipulated values
+            string description = $"{descriptionEn} - {descriptionFr}";
             string displayName = $"{SpaceNameEn} - {SpaceNameFr}";
             string sitePath = string.Concat("1000", itemId);
             string sharePointUrl = string.Concat(config["sharePointUrl"], sitePath);
@@ -66,7 +67,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             Auth auth = new Auth();
             var graphClient = auth.graphAuth(log);
 
-            var groupId = await CheckAndCreateGroup(graphClient, sharePointUrl, sitePath, displayName, descriptionEn, creatorId, owners, log);
+            var groupId = await CheckAndCreateGroup(graphClient, sharePointUrl, sitePath, displayName, description, creatorId, owners, log);
 
             if (groupId != string.Empty)
             {
