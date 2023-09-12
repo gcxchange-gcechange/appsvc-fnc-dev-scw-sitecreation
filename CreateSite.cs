@@ -373,10 +373,9 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     ProgressDelegate = (message, progress, total) =>
                     {
                         log.LogInformation(string.Format("{0:00}/{1:00} - {2} : {3}", progress, total, message, web.Title));
-                    }//,
-                    //PersistTemplateInfo = true
-                    //IgnoreDuplicateDataRowErrors
-                    //ClearNavigation
+                    },
+                    ClearNavigation = true,
+                    IgnoreDuplicateDataRowErrors = true
                 };
 
                 FileSystemConnector connector = new FileSystemConnector(schemaDir, "");
