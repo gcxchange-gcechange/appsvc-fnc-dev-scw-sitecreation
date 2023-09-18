@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Core;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -95,6 +96,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             }
             else
             {
+                await AddToStatusQueue(connectionString, itemId, "Site Exists", log);
                 log.LogInformation("Site already exists");
             }
 
@@ -448,6 +450,37 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             }
 
             log.LogInformation("SiteToHubAssociation processed a request.");
+        }
+
+        public static async Task<IActionResult> AddToStatusQueue(string connectionString, string itemId, string status, ILogger log)
+        {
+            log.LogInformation("AddToStatusQueue received a request.");
+
+            try
+            {
+                var listItem = new ListItem
+                {
+                    Fields = new FieldValueSet
+                    {
+                        AdditionalData = new Dictionary<string, object>()
+                        {
+                            { "Id", itemId },
+                            { "Status", status }
+                        }
+                    }
+                };
+                await Common.InsertMessageAsync(connectionString, "status", listItem, log);
+            }
+            catch (Exception e)
+            {
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
+            }
+
+            log.LogInformation("AddToStatusQueue processed a request.");
+
+            return new OkResult();
         }
     }
 }
