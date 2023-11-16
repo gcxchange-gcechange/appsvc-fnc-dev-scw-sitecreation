@@ -376,6 +376,25 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     {
                         log.LogInformation(string.Format("{0:00}/{1:00} - {2} : {3}", progress, total, message, web.Title));
                     },
+                    MessagesDelegate = (message, messageType) =>
+                    {
+                        switch (messageType)
+                        {
+                            case ProvisioningMessageType.Warning:
+                                log.LogWarning(string.Format("{0} : {1}", message, web.Title));
+                                break;
+                            case ProvisioningMessageType.Error:
+                                log.LogError(string.Format("{0} : {1}", message, web.Title));
+                                break;
+                            default:
+                                log.LogInformation(string.Format("{0} - {1} : {2}", messageType, message, web.Title));
+                                break;
+                        }
+                    },
+                    SiteProvisionedDelegate = (title, url) =>
+                    {
+                        log.LogInformation(string.Format("Site provisioning complete: {0} - {1}", title, url));
+                    },
                     ClearNavigation = true,
                     IgnoreDuplicateDataRowErrors = true
                 };

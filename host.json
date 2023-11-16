@@ -8,5 +8,10 @@
         "excludedTypes": "Request"
       }
     }
+  },
+  "extensions": {
+    "queues": {
+      "batchSize": 1
+    }
   }
 }
