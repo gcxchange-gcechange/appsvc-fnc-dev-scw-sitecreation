@@ -91,7 +91,6 @@
 						<CHOICE>zh-TW</CHOICE>
 					</CHOICES>
 				</Field>
-				<Field ID="{46e6583c-87b2-4560-87e6-734a34780746}" Type="Note" Group="_Hidden" Name="_SPHiddenHighlightsMetadata" DisplayName="Viva Topics Hidden Highlights" AllowDeletion="FALSE" ShowInNewForm="FALSE" ShowInEditForm="FALSE" ShowInDisplayForm="FALSE" ShowInViewForms="FALSE" ShowInListSettings="FALSE" ShowInVersionHistory="FALSE" SourceID="http://schemas.microsoft.com/sharepoint/v3" StaticName="_SPHiddenHighlightsMetadata" />
 				<Field ID="{cb19284a-cde7-4570-a980-1dab8bd74470}" Name="_ExtendedDescription" SourceID="http://schemas.microsoft.com/sharepoint/v3" StaticName="_ExtendedDescription" DisplayName="Description" Group="Extended Columns" RichText="TRUE" ShowInEditForm="FALSE" RichTextMode="Compatible" CanToggleHidden="TRUE" Type="Note" />
 				<Field ID="{fed55352-c65f-410c-9b96-021a35f2591f}" Name="_SPTranslationSourceItemId" StaticName="_SPTranslationSourceItemId" DisplayName="Translation Source ID" Type="Guid" SourceID="http://schemas.microsoft.com/sharepoint/v3" Group="_Hidden" Description="Unique ID of the item this translation is based on" AllowDeletion="FALSE" ReadOnly="TRUE" ShowInNewForm="FALSE" ShowInEditForm="FALSE" ShowInDisplayForm="FALSE" ShowInViewForms="FALSE" ShowInListSettings="FALSE" ShowInVersionHistory="FALSE" />
 				<Field ID="{AC9CE95B-F081-4B8A-BB19-2F4427D44674}" Name="_ExpirationDate" SourceID="http://schemas.microsoft.com/sharepoint/v3" StaticName="_ExpirationDate" Hidden="TRUE" Group="_Hidden" ReadOnly="TRUE" Type="Lookup" List="Docs" ShowField="ExpirationDate" DisplayName="Expiration Date" FromBaseType="TRUE" DisplaceOnUpgrade="TRUE" FieldRef="ID" JoinColName="DoclibRowId" JoinRowOrdinal="0" JoinType="INNER" />
@@ -156,7 +155,6 @@
 						<CHOICE>zh-TW</CHOICE>
 					</CHOICES>
 				</Field>
-				<Field ID="{b03d6d98-defb-4047-9d2d-a741eb0b4c68}" Type="User" List="UserInfo" Group="_Hidden" Name="_SPHideListEditorMetadata" DisplayName="Hide Highlights List Editor" AllowDeletion="FALSE" ShowInNewForm="FALSE" ShowInEditForm="FALSE" ShowInDisplayForm="FALSE" ShowInViewForms="FALSE" ShowInListSettings="FALSE" ShowInVersionHistory="FALSE" SourceID="http://schemas.microsoft.com/sharepoint/v3" StaticName="_SPHideListEditorMetadata" />
 				<Field ID="{577d74a4-b828-4c3c-bfcd-b16d76cdbc0a}" Name="ComplianceTagAppId" SourceID="http://schemas.microsoft.com/sharepoint/v3" Required="FALSE" ShowInFileDlg="FALSE" ShowInNewForm="FALSE" ShowInEditForm="FALSE" Hidden="TRUE" DisplaceOnUpgrade="TRUE" ReadOnly="TRUE" StaticName="ComplianceTagAppId" Type="Text" DisplayName="Label applied by App Id" Sortable="FALSE" />
 				<Field ID="{3BDAB9AC-9E5D-44D4-BDE9-13B37E170618}" Name="_ColorHex" SourceID="http://schemas.microsoft.com/sharepoint/v3" Required="FALSE" Hidden="TRUE" ShowInFileDlg="FALSE" ShowInNewForm="FALSE" ShowInEditForm="FALSE" DisplaceOnUpgrade="TRUE" StaticName="_ColorHex" Type="Text" DisplayName="Color" Sortable="FALSE" />
 				<Field ID="{76D13CD2-1BAE-45A5-8B74-545B87B65037}" Name="_ColorTag" SourceID="http://schemas.microsoft.com/sharepoint/v3" Required="FALSE" ShowInFileDlg="FALSE" ShowInNewForm="FALSE" ShowInEditForm="FALSE" ReadOnly="TRUE" DisplaceOnUpgrade="TRUE" Type="Text" StaticName="_ColorTag" DisplayName="Color Tag" Sortable="TRUE" />
@@ -549,8 +547,6 @@
 						<pnp:FieldRef ID="b6ee4892-f45b-44b4-9b52-d31be51e8f5f" Name="_SPTranslationLanguage" DisplayName="Item Language" />
 						<pnp:FieldRef ID="fed55352-c65f-410c-9b96-021a35f2591f" Name="_SPTranslationSourceItemId" DisplayName="Translation Source ID" />
 						<pnp:FieldRef ID="4cfeca70-6332-4beb-93c5-05c950fe3888" Name="_SPIsTranslation" DisplayName="Translation" />
-						<pnp:FieldRef ID="46e6583c-87b2-4560-87e6-734a34780746" Name="_SPHiddenHighlightsMetadata" DisplayName="Viva Topics Hidden Highlights" />
-						<pnp:FieldRef ID="b03d6d98-defb-4047-9d2d-a741eb0b4c68" Name="_SPHideListEditorMetadata" DisplayName="Hide Highlights List Editor" />
 					</pnp:FieldRefs>
 				</pnp:ListInstance>
 				<pnp:ListInstance Title="Style Library" Description="Use the style library to store style sheets, such as CSS or XSL files. The style sheets in this gallery can be used by this site or any of its subsites." DocumentTemplate="" TemplateType="101" Url="Style Library" EnableVersioning="true" MinorVersionLimit="0" MaxVersionLimit="500" DraftVersionVisibility="0" TemplateFeatureID="00bfea71-e717-4e80-aa17-d0c71b360101" EnableAttachments="false" DefaultDisplayFormUrl="{site}/Style Library/Forms/DispForm.aspx" DefaultEditFormUrl="{site}/Style Library/Forms/EditForm.aspx" DefaultNewFormUrl="{site}/Style Library/Forms/Upload.aspx" ImageUrl="/_layouts/15/images/itdl.png?rev=47" IrmExpire="false" IrmReject="false" IsApplicationList="false" ValidationFormula="" ValidationMessage="">
