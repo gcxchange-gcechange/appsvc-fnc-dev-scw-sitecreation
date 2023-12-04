@@ -650,7 +650,7 @@
 					</pnp:Translations>
 				</pnp:ClientSidePage>
 				<pnp:ClientSidePage PromoteAsNewsArticle="false" PromoteAsTemplate="false" Overwrite="true" EnableComments="false" Title="Files" ThumbnailUrl="" PageName="Files.aspx" LCID="1033" CreateTranslations="true">
-					<pnp:Header Type="Custom" ServerRelativeImageUrl="/_layouts/15/images/sleektemplateimagetile.jpg" LayoutType="NoImage" ShowTopicHeader="false" ShowPublishDate="false" ShowBackgroundGradient="false" TopicHeader="" AlternativeText="" Authors="[{&quot;id&quot;:&quot;i:0#.f|membership|stephanie.lefebvre@devgcx.ca&quot;,&quot;upn&quot;:&quot;stephanie.lefebvre@devgcx.ca&quot;,&quot;email&quot;:&quot;stephanie.lefebvre@devgcx.ca&quot;,&quot;name&quot;:&quot;Stephanie Lefebvre&quot;,&quot;role&quot;:&quot;056&quot;}]" AuthorByLine="[&quot;i:0#.f|membership|stephanie.lefebvre@devgcx.ca&quot;]" AuthorByLineId="11" />
+					<pnp:Header Type="Custom" ServerRelativeImageUrl="/_layouts/15/images/sleektemplateimagetile.jpg" LayoutType="NoImage" ShowTopicHeader="false" ShowPublishDate="false" ShowBackgroundGradient="false" TopicHeader="" AlternativeText="" />
 					<pnp:Sections>
 						<pnp:Section Order="1" Type="OneColumn">
 							<pnp:Controls>
@@ -667,7 +667,7 @@
 					</pnp:Sections>
 					<pnp:Translations>
 						<pnp:ClientSidePage PromoteAsNewsArticle="false" PromoteAsTemplate="false" Overwrite="true" EnableComments="false" Title="Dossiers" ThumbnailUrl="" LCID="1036" PageName="fr/Files.aspx">
-							<pnp:Header Type="Custom" ServerRelativeImageUrl="/_layouts/15/images/sleektemplateimagetile.jpg" LayoutType="NoImage" ShowTopicHeader="false" ShowPublishDate="false" ShowBackgroundGradient="false" TopicHeader="" AlternativeText="" Authors="[{&quot;id&quot;:&quot;i:0#.f|membership|stephanie.lefebvre@devgcx.ca&quot;,&quot;upn&quot;:&quot;stephanie.lefebvre@devgcx.ca&quot;,&quot;email&quot;:&quot;stephanie.lefebvre@devgcx.ca&quot;,&quot;name&quot;:&quot;Stephanie Lefebvre&quot;,&quot;role&quot;:&quot;056&quot;}]" AuthorByLine="[&quot;i:0#.f|membership|stephanie.lefebvre@devgcx.ca&quot;]" AuthorByLineId="11" />
+							<pnp:Header Type="Custom" ServerRelativeImageUrl="/_layouts/15/images/sleektemplateimagetile.jpg" LayoutType="NoImage" ShowTopicHeader="false" ShowPublishDate="false" ShowBackgroundGradient="false" TopicHeader="" AlternativeText="" />
 							<pnp:Sections>
 								<pnp:Section Order="1" Type="OneColumn">
 									<pnp:Controls>
