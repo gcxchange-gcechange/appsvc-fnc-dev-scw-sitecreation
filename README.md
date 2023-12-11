@@ -19,6 +19,7 @@ The following user accounts (as reflected in the app settings) are required:
 | Account             | Membership requirements                                  |
 | ------------------- | -------------------------------------------------------- |
 | delegatedUserName   | Member of site that hosts the list of community requests |
+| delegatedUserName   | Member of site that hosts the list of teams links        |
 
 ## Version 
 
@@ -45,6 +46,7 @@ Sharepoint
 
 | Name                    	| Description                                                                   					         |
 | -------------------------	| ------------------------------------------------------------------------------------------------ |
+| apprefSiteId              | Id of the SharePoint stei taht hosts the list of teams links |
 | AzureWebJobsStorage     	| Connection string for the storage acoount                                     					         |
 | clientId                	| The application (client) ID of the app registration                           					         |
 | delegatedUserName         | Delegated authentication user for applying the template and updating Request list 				       |
@@ -57,6 +59,7 @@ Sharepoint
 | secretName              	| Secret name used to authorize the function app                                					         |
 | sharePointUrl				      | The base url under which new sites will be created 												                       |
 | siteId					          | Id of the SharePoint site that hosts the list of community requests           					         |
+| teamsLinkListId | Id of the SharePoint list for teams links |
 | tenantId                	| Id of the Azure tenant that hosts the function app                            					         |
 | tenantName				        | Name of the tenant that hosts the function app                                					         |
 

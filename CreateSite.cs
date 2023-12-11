@@ -13,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.SharePoint.Client;
+using Microsoft.SharePoint.News.DataModel;
 using Newtonsoft.Json;
 using PnP.Framework.Http;
 using PnP.Framework.Provisioning.Connectors;
@@ -21,6 +22,7 @@ using PnP.Framework.Provisioning.ObjectHandlers;
 using PnP.Framework.Provisioning.Providers.Xml;
 using static appsvc_fnc_dev_scw_sitecreation_dotnet001.Auth;
 using ExecutionContext = Microsoft.Azure.WebJobs.ExecutionContext;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 using ListItem = Microsoft.Graph.ListItem;
 
 namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
@@ -30,12 +32,13 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
         private static string teamsUrl = string.Empty;
 
         [FunctionName("CreateSite")]
-        public static async Task RunAsync([QueueTrigger("sitecreation", Connection = "AzureWebJobsStorage")]string myQueueItem, ILogger log, ExecutionContext functionContext)
+        public static async Task RunAsync([QueueTrigger("sitecreation", Connection = "AzureWebJobsStorage")] string myQueueItem, ILogger log, ExecutionContext functionContext)
         {
             log.LogInformation("CreateSite trigger function received a request.");
 
             // assign variables from config
             IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
+            string apprefSiteId = config["apprefSiteId"];
             string connectionString = config["AzureWebJobsStorage"];
             string creatorId = config["ownerId"];
             string delegatedUserName = config["delegatedUserName"];
@@ -44,6 +47,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string hubSiteId = config["hubSiteId"];
             string listId = config["listId"];
             string siteId = config["siteId"];
+            string teamsLinkListId = config["teamsLinkListId"];
             string tenantId = config["tenantId"];
             string tenantName = config["tenantName"];
 
@@ -83,14 +87,16 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 // wait 3 minutes to allow for provisioning
                 Thread.Sleep(3 * 60 * 1000);
 
-                var teamId = await AddTeam(groupId, tenantId, delegatedUserName, delegatedUserSecret, log);
+                var teamsId = await AddTeam(groupId, tenantId, delegatedUserName, delegatedUserSecret, log);
+
+                await AddToTeamsLinkList(tokenCredential, apprefSiteId, teamsLinkListId, displayName, teamsId, teamsUrl, log);
 
                 await SiteToHubAssociation(ctx, hubSiteId, log);
 
                 await ApplyTemplate(ctx, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, functionContext, log);
 
                 // deferred functionality
-                //await AddMembersToTeam(graphClient, log, groupId, teamId, members);
+                //await AddMembersToTeam(graphClient, log, groupId, teamsId, members);
 
                 await AddToSensitivityQueue(connectionString, queueName, itemId, sitePath, groupId, SpaceNameEn, SpaceNameFr, requesterName, requesterEmail, log);
             }
@@ -149,7 +155,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 await graphClient.Sites[siteId].Lists[listId].Items[itemId].Fields.Request().UpdateAsync(fieldValueSet);
             }
-
             catch (Exception e)
             {
                 log.LogError($"Message: {e.Message}");
@@ -205,7 +210,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     AdditionalData = new Dictionary<string, object>
                     {
                         {"owners@odata.bind" , ownerList}
-                    }               
+                    }
                 };
 
                 var result = await graphClient.Groups.Request().AddAsync(o365Group);
@@ -500,6 +505,44 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             log.LogInformation("AddToStatusQueue processed a request.");
 
             return new OkResult();
+        }
+
+        public static async Task<bool> AddToTeamsLinkList(ROPCConfidentialTokenCredential tokenCredential, string siteId, string listId, string title, string teamsId, string teamsUrl, ILogger log)
+        {
+            log.LogInformation("AddToTeamsLinkList received a request.");
+
+            bool result = true;
+
+            try
+            {
+                var graphClient = new GraphServiceClient(tokenCredential);
+
+                var listItem = new ListItem
+                {
+                    Fields = new FieldValueSet
+                    {
+                        AdditionalData = new Dictionary<string, object>()
+                        {
+                            {"Title", title},
+                            {"TeamsID", teamsId},
+                            {"Teamslink", teamsUrl}
+                        }
+                    }
+                };
+
+                await graphClient.Sites[siteId].Lists[listId].Items.Request().AddAsync(listItem);
+            }
+            catch (Exception e)
+            {
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
+                result = false;
+            }
+
+            log.LogInformation("AddToTeamsLinkList processed a request.");
+
+            return result;
         }
     }
 }
