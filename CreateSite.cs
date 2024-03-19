@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using Azure.Core;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
@@ -73,6 +74,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             var graphClient = auth.graphAuth(log);
 
             var groupId = await CheckAndCreateGroup(graphClient, sharePointUrl, sitePath, displayName, description, creatorId, owners, log);
+            log.LogInformation($"groupId: {groupId}");
 
             if (groupId != string.Empty)
             {
@@ -192,12 +194,30 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 foreach (string email in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
                 {
                     log.LogInformation($"email = {email}");
-                    var user = await graphClient.Users.Request().Filter($"mail eq '{email}'").GetAsync();
-                    var Id = user[0].Id;
-                    log.LogInformation($"Id = {Id}");
-                    ownerList.Add($"https://graph.microsoft.com/v1.0/users/{Id}");
-                }
 
+                   try
+                   {
+                        var user = await graphClient.Users.Request().Filter(Uri.EscapeDataString($"mail eq '{email.Trim().Replace("'", "''")}'")).GetAsync();
+
+                        if (user != null)
+                        {
+                            string Id = user[0].Id;
+                            log.LogInformation($"Id = {Id}");
+                            ownerList.Add($"https://graph.microsoft.com/v1.0/users/{Id}");
+                        }
+                        else
+                        {
+                            log.LogInformation($"Id not found for user {email}");
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        log.LogInformation($"Id not found for user {email}");
+                        log.LogError($"Message: {e.Message}");
+                        if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                        log.LogError($"StackTrace: {e.StackTrace}");
+                    }
+                }
                 var o365Group = new Microsoft.Graph.Group
                 {
                     Description = description,
