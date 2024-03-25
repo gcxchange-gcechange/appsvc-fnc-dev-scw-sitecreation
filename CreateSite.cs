@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq.Expressions;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using Azure.Core;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
@@ -30,6 +32,14 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
     public class CreateSite
     {
         private static string teamsUrl = string.Empty;
+
+        public enum GroupCreationStatus : int
+        {
+            Success = 0,
+            SiteExists = 1,
+            NoOwner = 2,
+            Unknown = 3
+        }
 
         [FunctionName("CreateSite")]
         public static async Task RunAsync([QueueTrigger("sitecreation", Connection = "AzureWebJobsStorage")] string myQueueItem, ILogger log, ExecutionContext functionContext)
@@ -74,7 +84,18 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
             var groupId = await CheckAndCreateGroup(graphClient, sharePointUrl, sitePath, displayName, description, creatorId, owners, log);
 
-            if (groupId != string.Empty)
+            Guid guidOutput;
+            GroupCreationStatus status;
+            bool isValid = Guid.TryParse(groupId, out guidOutput);
+
+            if (isValid)
+                status = GroupCreationStatus.Success;
+            else
+                status = Enum.Parse<GroupCreationStatus>(groupId);
+
+            log.LogInformation($"Group creation status: {status}");
+
+            if (status == GroupCreationStatus.Success)
             {
                 ROPCConfidentialTokenCredential tokenCredential = new ROPCConfidentialTokenCredential(delegatedUserName, delegatedUserSecret, log);
                 var scopes = new string[] { $"https://{tenantName}.sharepoint.com/.default" };
@@ -100,10 +121,13 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 await AddToSensitivityQueue(connectionString, queueName, itemId, sitePath, groupId, SpaceNameEn, SpaceNameFr, requesterName, requesterEmail, log);
             }
-            else
+            else if (status == GroupCreationStatus.SiteExists)
             {
                 await AddToStatusQueue(connectionString, itemId, "Site Exists", log);
-                log.LogInformation("Site already exists");
+            }
+            else if (status == GroupCreationStatus.NoOwner)
+            {
+                await AddToStatusQueue(connectionString, itemId, "No Owner", log);
             }
 
             log.LogInformation("CreateSite trigger function processed a request.");
@@ -175,10 +199,10 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             // make sure team site does not already exist
             HttpClient client = new HttpClient();
             var response = await client.GetAsync(sharePointUrl);
-            //either option not making a difference: HttpCompletionOption.ResponseHeadersRead
             log.LogInformation($"response.StatusCode: {response.StatusCode}");
+
             if (response.StatusCode != HttpStatusCode.NotFound && response.StatusCode != HttpStatusCode.Forbidden)
-                return string.Empty;
+                return Convert.ToString(GroupCreationStatus.SiteExists);
 
             string groupId;
 
@@ -192,38 +216,65 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 foreach (string email in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
                 {
                     log.LogInformation($"email = {email}");
-                    var user = await graphClient.Users.Request().Filter($"mail eq '{email}'").GetAsync();
-                    var Id = user[0].Id;
-                    log.LogInformation($"Id = {Id}");
-                    ownerList.Add($"https://graph.microsoft.com/v1.0/users/{Id}");
+
+                    try
+                    {
+                        var user = await graphClient.Users.Request().Filter(Uri.EscapeDataString($"mail eq '{email.Trim().Replace("'", "''")}'")).GetAsync();
+
+                        if (user != null)
+                        {
+                            string Id = user[0].Id;
+                            log.LogInformation($"Id = {Id}");
+                            ownerList.Add($"https://graph.microsoft.com/v1.0/users/{Id}");
+                        }
+                        else
+                        {
+                            log.LogInformation($"Id not found for user {email}");
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        log.LogInformation($"Id not found for user {email}");
+                        log.LogError($"Message: {e.Message}");
+                        if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                        log.LogError($"StackTrace: {e.StackTrace}");
+                    }
                 }
 
-                var o365Group = new Microsoft.Graph.Group
+                if (ownerList.Count > 1)
                 {
-                    Description = description,
-                    DisplayName = $@"{displayName}",
-                    GroupTypes = new List<String>() { "Unified" },
-                    MailEnabled = true,
-                    MailNickname = sitePath,
-                    SecurityEnabled = false,
-                    Visibility = "Private",
-                    AdditionalData = new Dictionary<string, object>
+                    var o365Group = new Microsoft.Graph.Group
+                    {
+                        Description = description,
+                        DisplayName = $@"{displayName}",
+                        GroupTypes = new List<String>() { "Unified" },
+                        MailEnabled = true,
+                        MailNickname = sitePath,
+                        SecurityEnabled = false,
+                        Visibility = "Private",
+                        AdditionalData = new Dictionary<string, object>
                     {
                         {"owners@odata.bind" , ownerList}
                     }
-                };
+                    };
 
-                var result = await graphClient.Groups.Request().AddAsync(o365Group);
-                groupId = result.Id;
-
-                log.LogInformation($"Site and Office 365 {displayName} created successfully. And groupId: {groupId}");
+                    var result = await graphClient.Groups.Request().AddAsync(o365Group);
+                    groupId = result.Id;
+                    log.LogInformation($"Site and Office 365 {displayName} created successfully. And groupId: {groupId}");
+                }
+                else
+                {
+                    // if the "else" condition is true then it means only the creator account was added to the owner list
+                    // so we want to stop the site creation process and update the status of the request
+                    groupId = Convert.ToString(GroupCreationStatus.NoOwner);
+                }
             }
             catch (Exception e)
             {
                 log.LogError($"Message: {e.Message}");
                 if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
                 log.LogError($"StackTrace: {e.StackTrace}");
-                groupId = string.Empty;
+                groupId = Convert.ToString(GroupCreationStatus.Unknown);
             }
 
             log.LogInformation($"CreateGroup processed a request. groupId: {groupId}");
