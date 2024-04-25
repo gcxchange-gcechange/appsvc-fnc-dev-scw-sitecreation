@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
@@ -41,6 +42,18 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             Unknown = 3
         }
 
+        public class TagBag
+        {
+            public string SitePath;
+            public List<KeyValuePair<string, string>> Tags;
+
+            public TagBag(string sitePath)
+            {
+                SitePath = sitePath;
+                Tags = new();
+            }
+        }
+
         [FunctionName("CreateSite")]
         public static async Task RunAsync([QueueTrigger("sitecreation", Connection = "AzureWebJobsStorage")] string myQueueItem, ILogger log, ExecutionContext functionContext)
         {
@@ -57,6 +70,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string hubSiteId = config["hubSiteId"];
             string listId = config["listId"];
             string siteId = config["siteId"];
+            string tagFunctionUrl = config["tagFunctionUrl"];
             string teamsLinkListId = config["teamsLinkListId"];
             string tenantId = config["tenantId"];
             string tenantName = config["tenantName"];
@@ -113,6 +127,8 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 await AddToTeamsLinkList(tokenCredential, apprefSiteId, teamsLinkListId, displayName, teamsId, teamsUrl, log);
 
                 await SiteToHubAssociation(ctx, hubSiteId, log);
+
+                await TagSite(ctx, sitePath, tagFunctionUrl, log);
 
                 await ApplyTemplate(ctx, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, functionContext, log);
 
@@ -525,6 +541,41 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             }
 
             log.LogInformation("SiteToHubAssociation processed a request.");
+        }
+
+        public static async Task TagSite(ClientContext ctx, string sitePath, string functionUrl, ILogger log)
+        {
+            log.LogInformation("TagSite received a request.");
+
+            var tBag = new TagBag(sitePath);
+            tBag.Tags.Add(new KeyValuePair<string, string>("Category", "policy"));
+            tBag.Tags.Add(new KeyValuePair<string, string>("SubCategory", "substantive"));
+
+            try
+            {
+                var pnpclient = PnPHttpClient.Instance.GetHttpClient(ctx);
+
+                HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, functionUrl)
+                {
+                    Content = new StringContent(JsonConvert.SerializeObject(tBag), Encoding.UTF8, "application/json")
+                };
+                request.Headers.Add("accept", "application/json;odata.metadata=none");
+                request.Headers.Add("odata-version", "4.0");
+
+                await PnPHttpClient.AuthenticateRequestAsync(request, ctx).ConfigureAwait(false);
+
+                HttpResponseMessage response = await pnpclient.SendAsync(request, new CancellationToken());
+
+                log.LogInformation($"response: {response}");
+            }
+            catch (Exception e)
+            {
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
+            }
+
+            log.LogInformation("TagSite processed a request.");
         }
 
         public static async Task<IActionResult> AddToStatusQueue(string connectionString, string itemId, string status, ILogger log)
