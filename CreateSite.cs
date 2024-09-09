@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 using System.Web;
 using Azure.Core;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
@@ -23,9 +22,9 @@ using PnP.Framework.Provisioning.Model;
 using PnP.Framework.Provisioning.ObjectHandlers;
 using PnP.Framework.Provisioning.Providers.Xml;
 using static appsvc_fnc_dev_scw_sitecreation_dotnet001.Auth;
-using ExecutionContext = Microsoft.Azure.WebJobs.ExecutionContext;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 using ListItem = Microsoft.Graph.ListItem;
+using Microsoft.Azure.Functions.Worker;
 
 namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 {
@@ -41,7 +40,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             Unknown = 3
         }
 
-        [FunctionName("CreateSite")]
+        [Function("CreateSite")]
         public static async Task RunAsync([QueueTrigger("sitecreation", Connection = "AzureWebJobsStorage")] string myQueueItem, ILogger log, ExecutionContext functionContext)
         {
             log.LogInformation("CreateSite trigger function received a request.");
