@@ -213,6 +213,8 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     $"https://graph.microsoft.com/v1.0/users/{creatorId}"
                 };
 
+                List<string> memberList = new List<string>();
+
                 foreach (string email in owners.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
                 {
                     log.LogInformation($"email = {email}");
@@ -226,6 +228,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                             string Id = user[0].Id;
                             log.LogInformation($"Id = {Id}");
                             ownerList.Add($"https://graph.microsoft.com/v1.0/users/{Id}");
+                            memberList.Add($"https://graph.microsoft.com/v1.0/users/{Id}");
                         }
                         else
                         {
@@ -253,9 +256,10 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                         SecurityEnabled = false,
                         Visibility = "Private",
                         AdditionalData = new Dictionary<string, object>
-                    {
-                        {"owners@odata.bind" , ownerList}
-                    }
+                        {
+                            {"owners@odata.bind" , ownerList},
+                            {"members@odata.bind" , memberList}
+                        }
                     };
 
                     var result = await graphClient.Groups.Request().AddAsync(o365Group);
