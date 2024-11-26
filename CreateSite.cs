@@ -77,6 +77,13 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string description = $"{descriptionEn} - {descriptionFr}";
             string displayName = $"{SpaceNameEn} - {SpaceNameFr}";
             string sitePath = string.Concat("1000", itemId);
+
+            if (queueName == "prob")
+            {
+                // prepend sharePointUrl with "b"
+                sitePath = string.Concat("b", sitePath);
+            }
+
             string sharePointUrl = string.Concat(config["sharePointUrl"], sitePath);
 
             Auth auth = new Auth();
