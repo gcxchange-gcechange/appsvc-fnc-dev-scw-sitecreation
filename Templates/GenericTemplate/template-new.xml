@@ -28,9 +28,6 @@
 						<pnp:NavigationNode Title="News / Nouvelles " Url="{site}/SitePages/News.aspx" />
 						<pnp:NavigationNode Title="Events / Événements" Url="{site}/SitePages/Events.aspx" />
 						<pnp:NavigationNode Title="Stats / Statistiques" Url="{site}/_layouts/15/siteanalytics.aspx?view=19" IsExternal="true" />
-						<pnp:NavigationNode Title="Recent" Url="" IsExternal="true">
-							<pnp:NavigationNode Title="Publics documents / Documents publics" Url="{site}/Publics documents  Documents publics/Forms/AllItems.aspx" />
-						</pnp:NavigationNode>
 					</pnp:StructuralNavigation>
 				</pnp:CurrentNavigation>
 			</pnp:Navigation>
@@ -784,7 +781,7 @@
 					</pnp:Translations>
 				</pnp:ClientSidePage>
 			</pnp:ClientSidePages>
-			<pnp:Header Layout="Compact" BackgroundEmphasis="Strong" />
+			<pnp:Header Layout="Extended" BackgroundEmphasis="Strong" />
 		</pnp:ProvisioningTemplate>
 	</pnp:Templates>
 </pnp:Provisioning>
