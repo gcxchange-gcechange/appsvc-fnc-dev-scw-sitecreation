@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq.Expressions;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
 using Azure.Core;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
@@ -15,7 +13,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.SharePoint.Client;
-using Microsoft.SharePoint.News.DataModel;
 using Newtonsoft.Json;
 using PnP.Framework.Http;
 using PnP.Framework.Provisioning.Connectors;
@@ -121,7 +118,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 await SiteToHubAssociation(ctx, hubSiteId, log);
 
-                await ApplyTemplate(ctx, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, functionContext, log);
+                await ApplyTemplate(ctx, queueName, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, functionContext, log);
 
                 // deferred functionality
                 //await AddMembersToTeam(graphClient, log, groupId, teamsId, members);
@@ -395,7 +392,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return teamId;
         }
 
-        public static async Task<bool> ApplyTemplate(ClientContext ctx, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsUrl, ExecutionContext functionContext, ILogger log)
+        public static async Task<bool> ApplyTemplate(ClientContext ctx, string queueName, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsUrl, ExecutionContext functionContext, ILogger log)
         {
             log.LogInformation("ApplyTemplate received a request.");
 
@@ -432,7 +429,12 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 XMLTemplateProvider sitesProvider = new XMLFileSystemTemplateProvider(schemaDir, "");
 
-                string PNP_TEMPLATE_FILE = "template-new.xml";
+                string PNP_TEMPLATE_FILE;
+
+                if (queueName == "prob")
+                    PNP_TEMPLATE_FILE = "template_prob.xml";
+                else
+                    PNP_TEMPLATE_FILE = "template_unclassified.xml";
 
                 ProvisioningTemplate template = sitesProvider.GetTemplate(PNP_TEMPLATE_FILE);
                 log.LogInformation($"Successfully found template with ID '{template.Id}'");
