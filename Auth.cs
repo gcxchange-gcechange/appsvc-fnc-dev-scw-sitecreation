@@ -1,19 +1,10 @@
 ﻿using Azure.Core;
 using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
-using Microsoft.Azure.KeyVault.Models;
-using Microsoft.Azure.KeyVault;
-using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
-using System;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Threading;
 
 namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 {

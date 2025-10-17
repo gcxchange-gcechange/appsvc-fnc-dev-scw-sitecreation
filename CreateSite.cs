@@ -1,17 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
-using System.Net.Http;
-using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using Azure.Core;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
+using Microsoft.Graph.Models;
 using Microsoft.SharePoint.Client;
 using Newtonsoft.Json;
 using PnP.Framework.Http;
@@ -19,10 +12,11 @@ using PnP.Framework.Provisioning.Connectors;
 using PnP.Framework.Provisioning.Model;
 using PnP.Framework.Provisioning.ObjectHandlers;
 using PnP.Framework.Provisioning.Providers.Xml;
+using System.Net;
+using System.Reflection;
 using static appsvc_fnc_dev_scw_sitecreation_dotnet001.Auth;
-using ExecutionContext = Microsoft.Azure.WebJobs.ExecutionContext;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
-using ListItem = Microsoft.Graph.ListItem;
+using ListItem = Microsoft.Graph.Models.ListItem;
 
 namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 {
@@ -38,10 +32,16 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             Unknown = 3
         }
 
-        [FunctionName("CreateSite")]
-        public static async Task RunAsync([QueueTrigger("sitecreation", Connection = "AzureWebJobsStorage")] string myQueueItem, ILogger log, ExecutionContext functionContext)
+        private readonly ILogger<CreateSite> _logger;
+        public CreateSite(ILogger<CreateSite> logger)
         {
-            log.LogInformation("CreateSite trigger function received a request.");
+            _logger = logger;
+        }
+
+        [Function("CreateSite")]
+        public async Task RunAsync([QueueTrigger("sitecreation", Connection = "AzureWebJobsStorage")] string myQueueItem, ExecutionContext functionContext)
+        {
+            _logger.LogInformation("CreateSite trigger function received a request.");
 
             // assign variables from config
             IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
@@ -84,9 +84,9 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string sharePointUrl = string.Concat(config["sharePointUrl"], sitePath);
 
             Auth auth = new Auth();
-            var graphClient = auth.graphAuth(log);
+            var graphClient = auth.graphAuth(_logger);
 
-            var groupId = await CheckAndCreateGroup(graphClient, sharePointUrl, sitePath, displayName, description, creatorId, owners, log);
+            var groupId = await CheckAndCreateGroup(graphClient, sharePointUrl, sitePath, displayName, description, creatorId, owners, _logger);
 
             Guid guidOutput;
             GroupCreationStatus status;
@@ -97,44 +97,48 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             else
                 status = Enum.Parse<GroupCreationStatus>(groupId);
 
-            log.LogInformation($"Group creation status: {status}");
+            _logger.LogInformation($"Group creation status: {status}");
 
             if (status == GroupCreationStatus.Success)
             {
-                ROPCConfidentialTokenCredential tokenCredential = new ROPCConfidentialTokenCredential(delegatedUserName, delegatedUserSecret, log);
+
+                ROPCConfidentialTokenCredential tokenCredential = new ROPCConfidentialTokenCredential(delegatedUserName, delegatedUserSecret, _logger);
                 var scopes = new string[] { $"https://{tenantName}.sharepoint.com/.default" };
                 var authManager = new PnP.Framework.AuthenticationManager();
                 var accessToken = await tokenCredential.GetTokenAsync(new TokenRequestContext(scopes), new CancellationToken());
+
                 var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
 
-                await UpdateSiteUrl(tokenCredential, sharePointUrl, siteId, listId, itemId, log);
+                await UpdateSiteUrl(tokenCredential, sharePointUrl, siteId, listId, itemId, _logger);
 
                 // wait 3 minutes to allow for provisioning
                 Thread.Sleep(3 * 60 * 1000);
 
-                var teamsId = await AddTeam(groupId, tenantId, delegatedUserName, delegatedUserSecret, log);
+                var teamsId = await AddTeam(groupId, tenantId, delegatedUserName, delegatedUserSecret, _logger);
 
-                await AddToTeamsLinkList(tokenCredential, apprefSiteId, teamsLinkListId, displayName, teamsId, teamsUrl, log);
+                await AddToTeamsLinkList(tokenCredential, apprefSiteId, teamsLinkListId, displayName, teamsId, teamsUrl, _logger);
 
-                await SiteToHubAssociation(ctx, hubSiteId, log);
+                await SiteToHubAssociation(ctx, hubSiteId, _logger);
 
-                await ApplyTemplate(ctx, queueName, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, functionContext, log);
+                ApplyTemplate(ctx, queueName, descriptionEn, descriptionFr, followingContentFeatureId, teamsUrl, functionContext, _logger);
 
                 // deferred functionality
                 //await AddMembersToTeam(graphClient, log, groupId, teamsId, members);
 
-                await AddToSensitivityQueue(connectionString, queueName, itemId, sitePath, groupId, SpaceNameEn, SpaceNameFr, requesterName, requesterEmail, log);
+                await AddToSensitivityQueue(connectionString, queueName, itemId, sitePath, groupId, SpaceNameEn, SpaceNameFr, requesterName, requesterEmail, _logger);
+
+
             }
             else if (status == GroupCreationStatus.SiteExists)
             {
-                await AddToStatusQueue(connectionString, itemId, "Site Exists", log);
+                await AddToStatusQueue(connectionString, itemId, "Site Exists", _logger);
             }
             else if (status == GroupCreationStatus.NoOwner)
             {
-                await AddToStatusQueue(connectionString, itemId, "No Owner", log);
+                await AddToStatusQueue(connectionString, itemId, "No Owner", _logger);
             }
 
-            log.LogInformation("CreateSite trigger function processed a request.");
+            _logger.LogInformation("CreateSite trigger function processed a request.");
         }
 
         public static async Task<bool> AddToSensitivityQueue(string connectionString, string queueName, string itemId, string sitePath, string groupId, string SpaceNameEn, string SpaceNameFr, string RequesterName, string RequesterEmail, ILogger log)
@@ -181,7 +185,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     }
                 };
 
-                await graphClient.Sites[siteId].Lists[listId].Items[itemId].Fields.Request().UpdateAsync(fieldValueSet);
+                await graphClient.Sites[siteId].Lists[listId].Items[itemId].Fields.PatchAsync(fieldValueSet);
             }
             catch (Exception e)
             {
@@ -225,11 +229,20 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                     try
                     {
-                        var user = await graphClient.Users.Request().Filter(Uri.EscapeDataString($"mail eq '{email.Trim().Replace("'", "''")}'")).GetAsync();
+                        //var user = await graphClient.Users.Request().Filter(Uri.EscapeDataString($"mail eq '{email.Trim().Replace("'", "''")}'")).GetAsync();
+                        var user = await graphClient.Users.GetAsync((requestConfiguration) =>
+                        {
+
+                            //requestConfiguration.QueryParameters.Filter = "imAddresses/any(i:i eq 'admin@contoso.com')";
+                            //Message: Invalid filter clause: Syntax error: character '%' is not valid at position 4 in 'mail%20eq%20%27testuser.d%27%27aoust%40devgcx.ca%27'.
+
+                            //requestConfiguration.QueryParameters.Filter = Uri.EscapeDataString($"mail eq '{email.Trim().Replace("'", "''")}'");
+                            requestConfiguration.QueryParameters.Filter = $"mail eq '{email.Trim().Replace("'", "''")}'";
+                        });
 
                         if (user != null)
                         {
-                            string Id = user[0].Id;
+                            string Id = user.Value[0].Id;
                             log.LogInformation($"Id = {Id}");
                             ownerList.Add($"https://graph.microsoft.com/v1.0/users/{Id}");
                             memberList.Add($"https://graph.microsoft.com/v1.0/users/{Id}");
@@ -250,7 +263,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 if (ownerList.Count > 1)
                 {
-                    var o365Group = new Microsoft.Graph.Group
+                    var o365Group = new Microsoft.Graph.Models.Group
                     {
                         Description = description,
                         DisplayName = $@"{displayName}",
@@ -266,7 +279,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                         }
                     };
 
-                    var result = await graphClient.Groups.Request().AddAsync(o365Group);
+                    var result = await graphClient.Groups.PostAsync(o365Group);
                     groupId = result.Id;
                     log.LogInformation($"Site and Office 365 {displayName} created successfully. And groupId: {groupId}");
                 }
@@ -365,12 +378,19 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     }
                 };
 
-                var t = await graphClient.Groups[groupId].Team.Request().PutAsync(team);
+                var t = await graphClient.Groups[groupId].Team.PutAsync(team);
+                
+
+
+
+
                 teamId = t.Id;
 
-                var channels = await graphClient.Teams[teamId].Channels.Request().GetAsync();
+                //var channels = await graphClient.Teams[teamId].Channels.Request().GetAsync();
+                var channels = await graphClient.Teams[teamId].Channels.GetAsync((requestConfiguration) => {});
+
                 var channelId = "";
-                foreach (var channel in channels)
+                foreach (var channel in channels.Value)
                 {
                     channelId = channel.Id;
                 }
@@ -392,7 +412,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             return teamId;
         }
 
-        public static async Task<bool> ApplyTemplate(ClientContext ctx, string queueName, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsUrl, ExecutionContext functionContext, ILogger log)
+        public static bool ApplyTemplate(ClientContext ctx, string queueName, string descriptionEn, string descriptionFr, string followingContentFeatureId, string teamsUrl, ExecutionContext functionContext, ILogger log)
         {
             log.LogInformation("ApplyTemplate received a request.");
 
@@ -410,33 +430,27 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 DirectoryInfo dInfo;
                 var schemaDir = "";
 
-                string currentDirectory = functionContext.FunctionDirectory;
+                string currentDirectory = Path.GetFullPath(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location));
 
                 if (currentDirectory == null)
                 {
-                    string workingDirectory = Environment.CurrentDirectory;
-                    currentDirectory = System.IO.Directory.GetParent(workingDirectory).Parent.Parent.FullName;
-                    dInfo = new DirectoryInfo(currentDirectory);
-                    schemaDir = dInfo + "\\GxDcCPS-SitesCreations-fnc\\bin\\Debug\\net461\\Templates\\GenericTemplate";
+                    log.LogError($"currentDirectory is null: {currentDirectory}");
+                    return false;
                 }
                 else
                 {
-                    dInfo = new DirectoryInfo(currentDirectory);
-                    schemaDir = dInfo.Parent.FullName + "\\Templates\\GenericTemplate";
+                    schemaDir = currentDirectory + "\\Templates\\GenericTemplate";
                 }
-
-                DirectoryInfo dInfo2 = new DirectoryInfo(schemaDir);
 
                 XMLTemplateProvider sitesProvider = new XMLFileSystemTemplateProvider(schemaDir, "");
 
                 string PNP_TEMPLATE_FILE;
-
                 if (queueName == "prob")
                     PNP_TEMPLATE_FILE = "template_prob.xml";
                 else
                     PNP_TEMPLATE_FILE = "template_unclassified.xml";
 
-                ProvisioningTemplate template = sitesProvider.GetTemplate(PNP_TEMPLATE_FILE);
+                ProvisioningTemplate template = sitesProvider.GetTemplate(schemaDir + "\\" + PNP_TEMPLATE_FILE);
                 log.LogInformation($"Successfully found template with ID '{template.Id}'");
 
                 ProvisioningTemplateApplyingInformation ptai = new ProvisioningTemplateApplyingInformation
@@ -470,7 +484,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                 FileSystemConnector connector = new FileSystemConnector(schemaDir, "");
                 template.Connector = connector;
-
                 template.Parameters.Add("DescriptionEn", descriptionEn);
                 template.Parameters.Add("DescriptionFr", descriptionFr);
                 template.Parameters.Add("MSTeamsUrl", teamsUrl);
@@ -493,8 +506,10 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             {
                 foreach (var item in ex.LoaderExceptions)
                 {
-                    log.LogInformation(item.Message);
+                    log.LogInformation($"ReflectionTypeLoadException: {item.Message}");
                 }
+
+                log.LogError($"StackTrace: {ex.StackTrace}");
             }
             catch (Exception e)
             {
@@ -594,7 +609,7 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                     }
                 };
 
-                await graphClient.Sites[siteId].Lists[listId].Items.Request().AddAsync(listItem);
+                await graphClient.Sites[siteId].Lists[listId].Items.PostAsync(listItem);
             }
             catch (Exception e)
             {
