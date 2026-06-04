@@ -229,14 +229,8 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 
                     try
                     {
-                        //var user = await graphClient.Users.Request().Filter(Uri.EscapeDataString($"mail eq '{email.Trim().Replace("'", "''")}'")).GetAsync();
                         var user = await graphClient.Users.GetAsync((requestConfiguration) =>
                         {
-
-                            //requestConfiguration.QueryParameters.Filter = "imAddresses/any(i:i eq 'admin@contoso.com')";
-                            //Message: Invalid filter clause: Syntax error: character '%' is not valid at position 4 in 'mail%20eq%20%27testuser.d%27%27aoust%40devgcx.ca%27'.
-
-                            //requestConfiguration.QueryParameters.Filter = Uri.EscapeDataString($"mail eq '{email.Trim().Replace("'", "''")}'");
                             requestConfiguration.QueryParameters.Filter = $"mail eq '{email.Trim().Replace("'", "''")}'";
                         });
 
@@ -379,14 +373,9 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 };
 
                 var t = await graphClient.Groups[groupId].Team.PutAsync(team);
-                
-
-
-
 
                 teamId = t.Id;
 
-                //var channels = await graphClient.Teams[teamId].Channels.Request().GetAsync();
                 var channels = await graphClient.Teams[teamId].Channels.GetAsync((requestConfiguration) => {});
 
                 var channelId = "";
@@ -427,7 +416,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 //deactivate the following content feature
                 web.DeactivateFeature(Guid.Parse(followingContentFeatureId));
 
-                DirectoryInfo dInfo;
                 var schemaDir = "";
 
                 string currentDirectory = Path.GetFullPath(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location));

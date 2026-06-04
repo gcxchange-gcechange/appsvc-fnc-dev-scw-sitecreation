@@ -37,7 +37,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             var client = new SecretClient(new Uri(keyVaultUrl), new DefaultAzureCredential(), optionsSecret);
             KeyVaultSecret secret = client.GetSecret(keyname);
             var clientSecret = secret.Value;
-            // var clientSecret = config["clientSecret"];
 
             // using Azure.Identity;
             var options = new TokenCredentialOptions
@@ -72,7 +71,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             string _username;
             ILogger _log;
 
-            // TEMP
             public ROPCConfidentialTokenCredential(ILogger log)
             {
                 IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
@@ -107,8 +105,6 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
                 KeyVaultSecret password = client.GetSecret(secretNamePassword);
                 _password = password.Value;
             }
-
-
 
             public ROPCConfidentialTokenCredential(string userName, string userSecretName, ILogger log)
             {
