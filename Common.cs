@@ -1,10 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
-using Microsoft.Graph;
+﻿using Azure.Storage.Queues;
+using Microsoft.Extensions.Logging;
+using Microsoft.Graph.Models;
 using Newtonsoft.Json;
-using System.Threading.Tasks;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Queue;
-using System;
 
 namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
 {
@@ -15,16 +12,13 @@ namespace appsvc_fnc_dev_scw_sitecreation_dotnet001
             log.LogInformation("InsertMessageAsync received a request.");
 
             try {
-                CloudStorageAccount storageAccount = CloudStorageAccount.Parse(connectionString);
-                CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
-                CloudQueue queue = queueClient.GetQueueReference(queueName);
-
                 string serializedMessage = JsonConvert.SerializeObject(listItem.Fields.AdditionalData);
-
                 log.LogInformation($"serializedMessage = {serializedMessage}");
 
-                CloudQueueMessage message = new CloudQueueMessage(serializedMessage);
-                await queue.AddMessageAsync(message);
+                QueueClientOptions options = new QueueClientOptions() { MessageEncoding = QueueMessageEncoding.Base64 };
+                QueueClient client = new QueueClient(connectionString, queueName, options);
+
+                await client.SendMessageAsync(serializedMessage);
             }
             catch (Exception e) {
                 log.LogInformation($"Message: {e.Message}");
